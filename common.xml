@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doc>
+    <!-- this files holds common declaration for all domain objects -->
+    <dbtypemappings>
+        <map from="guid" to="varchar(36)" />
+        <map from="string" to="varchar(%d)" fieldsize="128"/>
+        <map from="time" to="datetime" />
+    </dbtypemappings>
+
+    <gotypemappings>
+        <map from="guid" to="uuid.UUID" />
+        <map from="time" to="time.Time" />
+    </gotypemappings>
+
+
+    <dbcontrol>
+        <host>localhost</host>
+        <dbname>nagini</dbname>
+        <user>gnilk</user>
+        <password>nagini</password>
+    </dbcontrol>
+
+    <imports>
+        <package no_persistence="true">uuid github.com/satori/go.uuid</package>
+        <package>time</package>        
+    </imports>    
+</doc>
