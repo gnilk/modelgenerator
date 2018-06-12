@@ -25,6 +25,7 @@ func generateCode(options *Options, doc XMLDoc, source string, splitInFiles bool
 		doc.Imports = addImport(&doc, "bytes")         //append(doc.Imports, "bytes")
 		doc.Imports = addImport(&doc, "encoding/json") //append(doc.Imports, "encoding/json")
 		doc.Imports = addImport(&doc, "encoding/xml")  //append(doc.Imports, "encoding/xml")
+		doc.Imports = addImport(&doc, "fmt")
 	}
 
 	if splitInFiles != true {

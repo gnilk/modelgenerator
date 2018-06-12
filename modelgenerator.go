@@ -508,20 +508,45 @@ func (define *XMLDefine) generateEnumCode() string {
 	code += fmt.Sprintf(")\n")
 	code += fmt.Sprintf("\n")
 
-	code += fmt.Sprintf("var map%sToName=map[%s]string {\n", define.Name, define.Name)
+	code += fmt.Sprintf("var map%sToName = map[%s]string {\n", define.Name, define.Name)
 	for _, Int := range define.Ints {
 		code += fmt.Sprintf("  %d:\"%s\",\n", Int.Value, Int.Name)
 	}
-	// todo generate map here
 	code += fmt.Sprintf("}\n")
 	code += fmt.Sprintf("\n")
 
-	code += fmt.Sprintf("func (this *%s)String() string {\n", define.Name)
+	code += fmt.Sprintf("var map%sToValue = map[string]%s {\n", define.Name, define.Name)
+	for _, Int := range define.Ints {
+		code += fmt.Sprintf("  \"%s\":%d,\n", Int.Name, Int.Value)
+	}
+	code += fmt.Sprintf("}\n")
+	code += fmt.Sprintf("\n")
+
+	// todo generate map here
+
+	code += fmt.Sprintf("func (this *%s) String() string {\n", define.Name)
 	code += fmt.Sprintf("  return map%sToName[*this]\n", define.Name)
 	code += fmt.Sprintf("}\n")
 	code += fmt.Sprintf("\n")
 
-	return code
+	code += fmt.Sprintf("func (this %s) MarshalJSON() ([]byte, error) {\n", define.Name)
+	code += fmt.Sprintf("  return json.Marshal(this.String())\n")
+	code += fmt.Sprintf("}\n")
+	code += fmt.Sprintf("\n")
+
+	code += fmt.Sprintf("func (this *%s) UnmarshalJSON(data []byte) error {\n", define.Name)
+	code += fmt.Sprintf("  var s string\n")
+	code += fmt.Sprintf("  if err := json.Unmarshal(data, &s); err != nil {\n")
+	code += fmt.Sprintf("    return fmt.Errorf(\"%s should be a string\")\n", define.Name)
+	code += fmt.Sprintf("  }\n")
+	code += fmt.Sprintf("  v, ok := map%sToValue[s]\n", define.Name)
+	code += fmt.Sprintf("  if !ok {\n")
+	code += fmt.Sprintf("    return fmt.Errorf(\"invalid %s\")", define.Name)
+	code += fmt.Sprintf("  }\n")
+	code += fmt.Sprintf("  *this = v\n")
+	code += fmt.Sprintf("  return nil\n")
+	code += fmt.Sprintf("}")
+	code += fmt.Sprintf("\n")
 }
 
 func (define *XMLDefine) dump() {
@@ -635,6 +660,7 @@ func printHelp() {
 	fmt.Println("Usage: modelgenerator [-sv] [-p <class>] [-f <num>] [-o <file/dir>] <inputfile>")
 	fmt.Println("Options")
 	fmt.Println("  -f : From Version, generates any class/field matching >= specified version (0 means as virgin)")
+	fmt.Println("  -P : Table name prefix (default is 'nagini_se_')")
 	fmt.Println("  -p : Generate persistence (use optional 'class' to specifiy which class for persistence, or '-' for all - default)")
 	fmt.Println("  -d : Generate drop statements before create (default = false)")
 	fmt.Println("  -s : split each type in separate file")

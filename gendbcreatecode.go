@@ -46,7 +46,12 @@ func generateDBCreateCode(doc XMLDoc, options *Options) string {
 }
 
 func generateDBCreateHeader(doc XMLDoc, source string) string {
-	code := "USE `nagini`;\n"
+	code := ""
+	if len(doc.DBControl.DBName) > 0 {
+		code = fmt.Sprintf("USE `%s`;\n", doc.DBControl.DBName)
+	} else {
+		code = "USE `nagini`;\n"
+	}
 
 	return code
 }
