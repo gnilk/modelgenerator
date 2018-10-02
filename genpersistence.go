@@ -178,7 +178,7 @@ func (define *XMLDefine) generatePersistenceCode(options *Options, className str
 		}
 	}
 
-	log.Printf("Generating persistence for class: %s\n", className)
+	log.Printf("Generating persistence for class: %s\n", define.Name)
 
 	//	code += fmt.Sprintf("   DB_SCHEMA      = \"%s%s\"\n", options.DBTablePrefix, schemaName)
 
@@ -286,15 +286,28 @@ func (define *XMLDefine) generatePersistenceCreateCode() string {
 
 	//lastName := define.lastPersistedMethodName()
 
+	haveAtleastOneField := false
+
 	for _, f := range define.Methods {
+		// log.Printf(" Method: %s\n", f.Name)
 		if f.noPersist == true {
 			continue
 		}
 		//		lastName = f.Name // preserve for next round
 		dbFieldName := strings.ToLower(f.Name)
+
+		// log.Printf("   dbFieldName: %s\n", dbFieldName)
+		// log.Printf("   primaryFieldName: %s\n", primaryFieldName)
+
 		if strings.Compare(primaryFieldName, dbFieldName) != 0 {
 			code += fmt.Sprintf("%s=?,", dbFieldName)
+			haveAtleastOneField = true
 		}
+	}
+
+	// TODO: Check if we should support this... not quite sure..
+	if !haveAtleastOneField {
+		log.Fatalf("Class: '%s' has only one field or no field!! - this won't work, set attribute 'nonpersist=\"true\"' on class to generate lagnuage definition but no persistence code.", define.Name)
 	}
 
 	code = code[:len(code)-1]

@@ -547,6 +547,8 @@ func (define *XMLDefine) generateEnumCode() string {
 	code += fmt.Sprintf("  return nil\n")
 	code += fmt.Sprintf("}")
 	code += fmt.Sprintf("\n")
+
+	return code
 }
 
 func (define *XMLDefine) dump() {
