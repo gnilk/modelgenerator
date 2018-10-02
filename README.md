@@ -47,7 +47,9 @@ Options
 inputfile : XML Data Model definition file
 
 Example invocation:
-modelgenerator -v -p -c file.xml -o file.go
+modelgenerator -v -p - -c file.xml -o file.go
+
+When using '-p -' (for all classes) the generator will bail if it can't generate the class. This typically happens for classes with a single item (like list definitions). Such classes should have the 'nopersist="true"' attribute.
 
 It is advisable to run GOIMPORTS on the generated file - that way you can have a common set of imports in your domain and GOIMPORTS will strip what's not used.
 The tool support type-mapping from the XML definition to GO and MYSQL types.
