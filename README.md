@@ -50,12 +50,11 @@ DB Layer Options
   -h : this page
 inputfile : XML Data Model definition file
 
-Examples:
-  Generate only language domain model without getters/setters (-g)
+## Examples:
+### Generate only language domain model without getters/setters (-g)**
   modelgenerator -v -g file.xml
 
-
-  Generate language domain model and persistence (CRUD) with getters/setters
+### Generate language domain model and persistence (CRUD) with getters/setters
   modelgenerator -v -p - -c file.xml -o file.go
 
 When using '-p -' (for all classes) the generator will bail if it can't generate the class. This typically happens for classes with a single item (like list definitions). Such classes should have the 'nopersist="true"' attribute.
