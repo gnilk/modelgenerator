@@ -32,22 +32,31 @@ You can specify additional imports in the 'imports' section. These will be place
 An XML document can hold many classes - each document will generate on GO file (there is an experimental option to split per class but - but I never use it).
 
 Use the tool like:
-modelgenerator v2 - XML Data Model to GO structure converter
+ModelGenerator 2.1 - XML Data Model to Language structure converter
 Usage: modelgenerator [-sv] [-p <class>] [-f <num>] [-o <file/dir>] <inputfile>
-Options
+General Options
   -f : From Version, generates any class/field matching >= specified version (0 means as virgin)
   -p : Generate persistence (use optional 'class' to specifiy which class for persistence, or '-' for all - default)
-  -d : Generate drop statements before create (default = false)
   -s : split each type in separate file
+Domain Model Options
   -c : generate convertes (to/from XML/JSON)
-  -o : specify output model go file or dir (if split in multiplefiles is true), default is stdout
+  -g : disable getters/setters
+  -o : specify output model file or '-' for stdout (default) 
+DB Layer Options
+  -P : Table name prefix (default is 'nagini_se_')
+  -d : Generate drop statements before create (default = false)
   -O : specify output database go file or dir (if split in multiplefiles is true), default is 'db.go'
   -v : increase verbose output (default 0 - none)
   -h : this page
 inputfile : XML Data Model definition file
 
-Example invocation:
-modelgenerator -v -p - -c file.xml -o file.go
+Examples:
+  Generate only language domain model without getters/setters (-g)
+  modelgenerator -v -g file.xml
+
+
+  Generate language domain model and persistence (CRUD) with getters/setters
+  modelgenerator -v -p - -c file.xml -o file.go
 
 When using '-p -' (for all classes) the generator will bail if it can't generate the class. This typically happens for classes with a single item (like list definitions). Such classes should have the 'nopersist="true"' attribute.
 
