@@ -7,16 +7,6 @@ import (
 	"strings"
 )
 
-type CodeGenerator struct {
-	Methods []common.AccessMethod
-	Imports []common.XMLImport
-}
-
-func CreateGoLangGenerator() common.Generator {
-	codeGen := CodeGenerator{}
-	return (common.Generator)(&codeGen)
-}
-
 func (generator *CodeGenerator) GenerateCode(doc common.XMLDoc, options *common.Options) string {
 
 	code := ""
@@ -142,32 +132,31 @@ func (generator *CodeGenerator) generateEnumCode(options *common.Options, define
 	code += fmt.Sprintf("}\n")
 	code += fmt.Sprintf("\n")
 
-	// todo generate map here
+	if options.Converters {
+		code += fmt.Sprintf("func (this *%s) String() string {\n", define.Name)
+		code += fmt.Sprintf("  return map%sToName[*this]\n", define.Name)
+		code += fmt.Sprintf("}\n")
+		code += fmt.Sprintf("\n")
 
-	code += fmt.Sprintf("func (this *%s) String() string {\n", define.Name)
-	code += fmt.Sprintf("  return map%sToName[*this]\n", define.Name)
-	code += fmt.Sprintf("}\n")
-	code += fmt.Sprintf("\n")
+		code += fmt.Sprintf("func (this %s) MarshalJSON() ([]byte, error) {\n", define.Name)
+		code += fmt.Sprintf("  return json.Marshal(this.String())\n")
+		code += fmt.Sprintf("}\n")
+		code += fmt.Sprintf("\n")
 
-	code += fmt.Sprintf("func (this %s) MarshalJSON() ([]byte, error) {\n", define.Name)
-	code += fmt.Sprintf("  return json.Marshal(this.String())\n")
-	code += fmt.Sprintf("}\n")
-	code += fmt.Sprintf("\n")
-
-	code += fmt.Sprintf("func (this *%s) UnmarshalJSON(data []byte) error {\n", define.Name)
-	code += fmt.Sprintf("  var s string\n")
-	code += fmt.Sprintf("  if err := json.Unmarshal(data, &s); err != nil {\n")
-	code += fmt.Sprintf("    return fmt.Errorf(\"%s should be a string\")\n", define.Name)
-	code += fmt.Sprintf("  }\n")
-	code += fmt.Sprintf("  v, ok := map%sToValue[s]\n", define.Name)
-	code += fmt.Sprintf("  if !ok {\n")
-	code += fmt.Sprintf("    return fmt.Errorf(\"invalid %s\")", define.Name)
-	code += fmt.Sprintf("  }\n")
-	code += fmt.Sprintf("  *this = v\n")
-	code += fmt.Sprintf("  return nil\n")
-	code += fmt.Sprintf("}")
-	code += fmt.Sprintf("\n")
-
+		code += fmt.Sprintf("func (this *%s) UnmarshalJSON(data []byte) error {\n", define.Name)
+		code += fmt.Sprintf("  var s string\n")
+		code += fmt.Sprintf("  if err := json.Unmarshal(data, &s); err != nil {\n")
+		code += fmt.Sprintf("    return fmt.Errorf(\"%s should be a string\")\n", define.Name)
+		code += fmt.Sprintf("  }\n")
+		code += fmt.Sprintf("  v, ok := map%sToValue[s]\n", define.Name)
+		code += fmt.Sprintf("  if !ok {\n")
+		code += fmt.Sprintf("    return fmt.Errorf(\"invalid %s\")", define.Name)
+		code += fmt.Sprintf("  }\n")
+		code += fmt.Sprintf("  *this = v\n")
+		code += fmt.Sprintf("  return nil\n")
+		code += fmt.Sprintf("}")
+		code += fmt.Sprintf("\n")
+	}
 	return code
 }
 
@@ -199,6 +188,14 @@ func (generator *CodeGenerator) generateClassCode(options *common.Options, defin
 	code += fmt.Sprintf("}\n")
 	code += fmt.Sprintf("\n")
 
+	if options.GettersAndSetters {
+		code += generator.generateGettersAndSettersForDefine(options, define)
+	}
+
+	return code
+}
+func (generator *CodeGenerator) generateGettersAndSettersForDefine(options *common.Options, define *common.XMLDefine) string {
+	code := ""
 	for _, method := range generator.Methods {
 		ptrAttrib := "*"
 		if method.IsPointer != true {
@@ -241,7 +238,6 @@ func (generator *CodeGenerator) generateClassCode(options *common.Options, defin
 			}
 		}
 	}
-
 	return code
 }
 

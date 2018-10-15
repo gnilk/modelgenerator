@@ -17,7 +17,6 @@ import (
 
 	"modelgenerator/common"
 	golang "modelgenerator/generators/golang"
-	"modelgenerator/generators/mysql"
 )
 
 const Name = "ModelGenerator"
@@ -93,7 +92,7 @@ func mergeDocuments(dst *common.XMLDoc, src *common.XMLDoc) *common.XMLDoc {
 //
 func generateLanguageModel(options *common.Options, doc common.XMLDoc) {
 
-	codeGenerator := golang.CreateGoLangGenerator()
+	codeGenerator := options.Language.GetModelGenerator()
 	code := codeGenerator.GenerateCode(doc, options)
 
 	if options.OutputName != "-" {
@@ -108,7 +107,7 @@ func generateLanguageModel(options *common.Options, doc common.XMLDoc) {
 // generate persistence layer for selected language
 //
 func generatePersistence(options *common.Options, doc common.XMLDoc) {
-	crudGenerator := mysql.CreateCrudGenerator()
+	crudGenerator := options.Language.GetCrudGenerator()
 
 	if options.Verbose > 0 {
 		log.Printf("Generating persistence code, saving to '%s'", options.OutputDBName)
@@ -122,7 +121,7 @@ func generatePersistence(options *common.Options, doc common.XMLDoc) {
 	//
 	// Create DB Create/Alter script - this is dumped to STDOUT
 	//
-	dbGenerator := mysql.CreateDBGenerator()
+	dbGenerator := options.Language.GetDBCreateGenerator()
 	var dbCreateCode = dbGenerator.GenerateCode(doc, options)
 	if options.Verbose > 0 {
 		log.Printf("dbCreateCode:\n")
@@ -133,19 +132,34 @@ func generatePersistence(options *common.Options, doc common.XMLDoc) {
 func printHelp() {
 	fmt.Printf("%s %s - XML Data Model to Language structure converter\n", Name, Version)
 	fmt.Println("Usage: modelgenerator [-sv] [-p <class>] [-f <num>] [-o <file/dir>] <inputfile>")
-	fmt.Println("Options")
+	fmt.Println("General Options")
 	fmt.Println("  -f : From Version, generates any class/field matching >= specified version (0 means as virgin)")
-	fmt.Println("  -P : Table name prefix (default is 'nagini_se_')")
 	fmt.Println("  -p : Generate persistence (use optional 'class' to specifiy which class for persistence, or '-' for all - default)")
-	fmt.Println("  -d : Generate drop statements before create (default = false)")
 	fmt.Println("  -s : split each type in separate file")
+	fmt.Println("Domain Model Options")
 	fmt.Println("  -c : generate convertes (to/from XML/JSON)")
+	fmt.Println("  -g : disable getters/setters")
 	fmt.Println("  -o : specify output model file or '-' for stdout (default) ")
+	fmt.Println("DB Layer Options")
+	fmt.Println("  -P : Table name prefix (default is 'nagini_se_')")
+	fmt.Println("  -d : Generate drop statements before create (default = false)")
 	fmt.Println("  -O : specify output database go file or dir (if split in multiplefiles is true), default is 'db.go'")
 	fmt.Println("  -v : increase verbose output (default 0 - none)")
 	fmt.Println("  -h : this page")
 	fmt.Println("inputfile : XML Data Model definition file")
 	fmt.Println("")
+}
+
+func getLanguage(name string) common.Language {
+	switch strings.ToLower(name) {
+	case "go":
+		fallthrough
+	case "golang":
+		log.Printf("Creating generators for GO\n")
+		return golang.CreateGoLanguage()
+	}
+	log.Fatalf("No support for language: %s\n", name)
+	return nil
 }
 
 func main() {
@@ -159,6 +173,7 @@ func main() {
 		OutputDBName:          "db.go",
 		PersistenceClass:      "-",
 		AllPersistenceClasses: nil,
+		GettersAndSetters:     true,
 		DoPersistence:         false,
 		IsUpgrade:             false,
 		FromVersion:           0, // Always assume from version 0
@@ -187,6 +202,9 @@ func main() {
 					if options.FromVersion > 0 {
 						options.IsUpgrade = true
 					}
+					break
+				case 'g':
+					options.GettersAndSetters = false
 					break
 				case 'p':
 					options.DoPersistence = true
@@ -243,6 +261,8 @@ func main() {
 		log.Printf("With root directory: %s\n", filepath.Dir(intputFilePath))
 		log.Printf("Generating from version: %d\n", options.FromVersion)
 	}
+
+	options.Language = getLanguage("go")
 
 	//fmt.Printf("Processing file: %s\n", filename)
 	//fmt.Println("Unmarshal XML")

@@ -1,4 +1,4 @@
-package mysql
+package golang
 
 //
 // Generates persistence base code for the POGO class
@@ -79,6 +79,9 @@ func generateDBCreateCodeForDefine(define *common.XMLDefine, options *common.Opt
 	switch define.Type {
 	case "class":
 		code += generateDBCreateCodeForClass(define, options)
+		break
+	case "enum":
+		// silent skip enum type - this is not an error, we just don't put them in the DB
 		break
 	default:
 		fmt.Printf("Error, can't generate code for type '%s'\n", define.Type)

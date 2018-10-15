@@ -1,4 +1,4 @@
-package mysql
+package golang
 
 //
 // Generates persistence base code for the POGO class
