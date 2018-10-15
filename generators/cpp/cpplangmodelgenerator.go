@@ -80,7 +80,7 @@ func (generator *CodeGenerator) fieldCode(options *common.Options, field *common
 	if field.IsPointer {
 		typePrefix = typePrefix + "*"
 	}
-	code += fmt.Sprintf("    %s %s%s;\n", field.TypeMapping(options.CurrentDoc.CPPTypeMappings), typePrefix, field.Name)
+	code += fmt.Sprintf("    %s %s%s;\n", field.TypeMappingLang(options.CurrentDoc.AnyTypeMappings, "cpp"), typePrefix, field.Name)
 
 	return code
 }

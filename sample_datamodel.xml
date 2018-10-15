@@ -25,13 +25,13 @@
         <map from="float" to="float32" />
     </gotypemappings>
 
-    <cpptypemappings>
-        <map from="string" to="std::string" />
-        <map from="guid" to="uuid_t" />
-        <map from="time" to="std::tm" />
-        <map from="mediumblob" to="uint8_t *"/>
-        <map from="float" to="float" />
-    </cpptypemappings>
+    <anytypemappings>
+        <map lang="cpp" from="string" to="std::string" />
+        <map lang="cpp" from="guid" to="uuid_t" />
+        <map lang="cpp" from="time" to="std::tm" />
+        <map lang="cpp" from="mediumblob" to="uint8_t *"/>
+        <map lang="cpp" from="float" to="float" />
+    </anytypemappings>
 
 
     <dbcontrol>

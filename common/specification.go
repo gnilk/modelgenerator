@@ -74,7 +74,6 @@ type XMLDoc struct {
 	Defines         []XMLDefine      `xml:"define"`
 	DBTypeMappings  []XMLTypeMapping `xml:"dbtypemappings>map"`
 	GOTypeMappings  []XMLTypeMapping `xml:"gotypemappings>map"`
-	CPPTypeMappings []XMLTypeMapping `xml:"cpptypemappings>map"`
 	AnyTypeMappings []XMLTypeMapping `xml:"anytypemappings>map"`
 	DBControl       XMLDBControl     `xml:"dbcontrol"`
 }

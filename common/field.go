@@ -29,6 +29,26 @@ func (field *XMLDataTypeField) TypeMapping(typeMappings []XMLTypeMapping) string
 	return field.Type
 }
 
+func (field *XMLDataTypeField) TypeMappingLang(typeMappings []XMLTypeMapping, lang string) string {
+	for _, mapping := range typeMappings {
+		if strings.Compare(mapping.Lang, lang) == 0 {
+			if mapping.FromType == field.Type {
+				// If this is not specified, assume the type mapping does not require it
+				if mapping.FieldSize == 0 {
+					return mapping.ToType
+				}
+				fs := field.FieldSize // Assume field has this defined
+				if fs == 0 {
+					fs = mapping.FieldSize
+				}
+				return fmt.Sprintf(mapping.ToType, fs)
+
+			}
+		}
+	}
+	return field.Type
+}
+
 //
 // TODO: These should be moved out of here
 //
