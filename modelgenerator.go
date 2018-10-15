@@ -18,6 +18,7 @@ import (
 	"modelgenerator/common"
 	"modelgenerator/generators/cpp"
 	golang "modelgenerator/generators/golang"
+	"modelgenerator/generators/typescript"
 )
 
 const Name = "ModelGenerator"
@@ -144,6 +145,7 @@ func printHelp() {
 	fmt.Println("  -f : From Version, generates any class/field matching >= specified version (0 means as virgin)")
 	fmt.Println("  -p : Generate persistence (use optional 'class' to specifiy which class for persistence, or '-' for all - default)")
 	fmt.Println("  -s : split each type in separate file")
+	fmt.Println("  -l : specify output language (go/cpp/ts)")
 	fmt.Println("Domain Model Options")
 	fmt.Println("  -c : generate convertes (to/from XML/JSON)")
 	fmt.Println("  -g : disable getters/setters")
@@ -170,6 +172,11 @@ func getLanguage(name string) common.Language {
 	case "c++":
 		log.Printf("Creating generators for C++\n")
 		return cpp.CreateCppLanguage()
+	case "typescript":
+		fallthrough
+	case "ts":
+		log.Printf("Creating generators for TS (TypeScript)\n")
+		return typescript.CreateTSLanguage()
 	}
 	log.Fatalf("No support for language: %s\n", name)
 	return nil
@@ -186,6 +193,7 @@ func main() {
 		OutputDBName:          "db.go",
 		PersistenceClass:      "-",
 		AllPersistenceClasses: nil,
+		UseLanguage:           "go",
 		GettersAndSetters:     true,
 		DoPersistence:         false,
 		IsUpgrade:             false,
@@ -208,6 +216,10 @@ func main() {
 					break
 				case 'd':
 					options.GenerateDropStatement = true
+					break
+				case 'l':
+					i++
+					options.UseLanguage = os.Args[i]
 					break
 				case 'f':
 					i++
@@ -273,11 +285,12 @@ func main() {
 		log.Printf("Processing file: %s\n", options.Filename)
 		log.Printf("With root directory: %s\n", filepath.Dir(intputFilePath))
 		log.Printf("Generating from version: %d\n", options.FromVersion)
+		log.Printf("Output language: %s\n", options.UseLanguage)
 	}
 
-	options.Language = getLanguage("cpp")
+	options.Language = getLanguage(options.UseLanguage)
 	if options.Language == nil {
-		log.Fatalf("No implementation for selected language\n")
+		log.Fatalf("No implementation for '%s'\n", options.UseLanguage)
 	}
 
 	//fmt.Printf("Processing file: %s\n", filename)
