@@ -41,12 +41,12 @@
         <password>sensors</password>
     </dbcontrol>
 
-    <define type="enum" name="UserRole">
+    <define type="enum" prefix="kUserRole_" name="UserRole">
         <int name="UserRoleAdmin" value="1"/>
         <int name="UserRoleUser" value="100"/>
     </define>
 
-    <define type="class" name="Resource">
+    <define type="class" prefix="m_" name="Resource">
         <field type="guid" name="UserID" />
         <field type="string" name="Name" />
         <field type="string" name="PasswordHash" />

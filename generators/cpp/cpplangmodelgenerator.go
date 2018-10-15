@@ -62,7 +62,7 @@ func (generator *CodeGenerator) generateClassCodeDefinition(define *common.XMLDe
 	code += fmt.Sprintf("public:\n")
 
 	for _, field := range define.Fields {
-		code += generator.fieldCode(options, &field)
+		code += generator.fieldCode(define, options, &field)
 		//generator.methodFromField(define, field, field.TypeMapping(options.CurrentDoc.GOTypeMappings), field.IsList)
 	}
 
@@ -70,7 +70,7 @@ func (generator *CodeGenerator) generateClassCodeDefinition(define *common.XMLDe
 	return code
 }
 
-func (generator *CodeGenerator) fieldCode(options *common.Options, field *common.XMLDataTypeField) string {
+func (generator *CodeGenerator) fieldCode(define *common.XMLDefine, options *common.Options, field *common.XMLDataTypeField) string {
 	code := ""
 
 	typePrefix := ""
@@ -80,7 +80,7 @@ func (generator *CodeGenerator) fieldCode(options *common.Options, field *common
 	if field.IsPointer {
 		typePrefix = typePrefix + "*"
 	}
-	code += fmt.Sprintf("    %s %s%s;\n", field.TypeMappingLang(options.CurrentDoc.AnyTypeMappings, "cpp"), typePrefix, field.Name)
+	code += fmt.Sprintf("    %s %s%s%s;\n", field.TypeMappingLang(options.CurrentDoc.AnyTypeMappings, "cpp"), typePrefix, define.Prefix, field.Name)
 
 	return code
 }
@@ -89,7 +89,7 @@ func (generator *CodeGenerator) generateEnumCodeDefinition(define *common.XMLDef
 	code := ""
 	code += fmt.Sprintf("typedef enum {\n")
 	for _, Int := range define.Ints {
-		code += fmt.Sprintf("    %s = %d,\n", Int.Name, Int.Value)
+		code += fmt.Sprintf("    %s%s = %d,\n", define.Prefix, Int.Name, Int.Value)
 	}
 	code += fmt.Sprintf("} %s;\n\n", define.Name)
 	return code

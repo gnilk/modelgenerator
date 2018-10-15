@@ -31,6 +31,7 @@ type XMLDefine struct {
 	Name            string             `xml:"name,attr"`
 	Inherits        string             `xml:"inherits,attr"`
 	DBSchema        string             `xml:"dbschema,attr"`
+	Prefix          string             `xml:"prefix,attr"`
 	SkipPersistance bool               `xml:"nopersist,attr"`
 	Fields          []XMLDataTypeField `xml:"field"`
 	Guids           []XMLDataTypeField `xml:"guid"`
