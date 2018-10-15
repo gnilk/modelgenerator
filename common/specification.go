@@ -54,6 +54,7 @@ type XMLImport struct {
 
 // XMLTypeMapping Holds type mappings definitions
 type XMLTypeMapping struct {
+	Lang      string `xml:"lang,attr"`
 	FromType  string `xml:"from,attr"`
 	ToType    string `xml:"to,attr"`
 	FieldSize int    `xml:"fieldsize,attr"`
@@ -74,5 +75,6 @@ type XMLDoc struct {
 	DBTypeMappings  []XMLTypeMapping `xml:"dbtypemappings>map"`
 	GOTypeMappings  []XMLTypeMapping `xml:"gotypemappings>map"`
 	CPPTypeMappings []XMLTypeMapping `xml:"cpptypemappings>map"`
+	AnyTypeMappings []XMLTypeMapping `xml:"anytypemappings>map"`
 	DBControl       XMLDBControl     `xml:"dbcontrol"`
 }
