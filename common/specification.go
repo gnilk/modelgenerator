@@ -66,12 +66,13 @@ type XMLInclude struct {
 
 // XMLDoc holds the document root
 type XMLDoc struct {
-	Namespace      string           `xml:"namespace,attr"`
-	DBSchema       string           `xml:"dbschema,attr"`
-	Includes       []XMLInclude     `xml:"include"`
-	Imports        []XMLImport      `xml:"imports>package"`
-	Defines        []XMLDefine      `xml:"define"`
-	DBTypeMappings []XMLTypeMapping `xml:"dbtypemappings>map"`
-	GOTypeMappings []XMLTypeMapping `xml:"gotypemappings>map"`
-	DBControl      XMLDBControl     `xml:"dbcontrol"`
+	Namespace       string           `xml:"namespace,attr"`
+	DBSchema        string           `xml:"dbschema,attr"`
+	Includes        []XMLInclude     `xml:"include"`
+	Imports         []XMLImport      `xml:"imports>package"`
+	Defines         []XMLDefine      `xml:"define"`
+	DBTypeMappings  []XMLTypeMapping `xml:"dbtypemappings>map"`
+	GOTypeMappings  []XMLTypeMapping `xml:"gotypemappings>map"`
+	CPPTypeMappings []XMLTypeMapping `xml:"cpptypemappings>map"`
+	DBControl       XMLDBControl     `xml:"dbcontrol"`
 }

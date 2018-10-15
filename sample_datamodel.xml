@@ -25,6 +25,14 @@
         <map from="float" to="float32" />
     </gotypemappings>
 
+    <cpptypemappings>
+        <map from="string" to="std::string" />
+        <map from="guid" to="uuid_t" />
+        <map from="time" to="std::tm" />
+        <map from="mediumblob" to="uint8_t *"/>
+        <map from="float" to="float" />
+    </cpptypemappings>
+
 
     <dbcontrol>
         <host>localhost</host>

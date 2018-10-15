@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"modelgenerator/common"
+	"modelgenerator/generators/cpp"
 	golang "modelgenerator/generators/golang"
 )
 
@@ -108,25 +109,32 @@ func generateLanguageModel(options *common.Options, doc common.XMLDoc) {
 //
 func generatePersistence(options *common.Options, doc common.XMLDoc) {
 	crudGenerator := options.Language.GetCrudGenerator()
-
-	if options.Verbose > 0 {
-		log.Printf("Generating persistence code, saving to '%s'", options.OutputDBName)
-		log.Printf("  DB Control: %v\n", doc.DBControl)
+	if crudGenerator != nil {
+		if options.Verbose > 0 {
+			log.Printf("Generating persistence code, saving to '%s'", options.OutputDBName)
+			log.Printf("  DB Control: %v\n", doc.DBControl)
+		}
+		//var persistenceCode = generatePersistenceCode(doc, options.PersistenceClass, options.Filename, options.SplitInFiles, options.Converters, options.Verbose, options.OutputName)
+		var persistenceCode = crudGenerator.GenerateCode(doc, options)
+		persistenceByteCode := []byte(persistenceCode)
+		ioutil.WriteFile(options.OutputDBName, persistenceByteCode, 0644)
+	} else {
+		log.Printf("No Crud generator for language\n")
 	}
-	//var persistenceCode = generatePersistenceCode(doc, options.PersistenceClass, options.Filename, options.SplitInFiles, options.Converters, options.Verbose, options.OutputName)
-	var persistenceCode = crudGenerator.GenerateCode(doc, options)
-	persistenceByteCode := []byte(persistenceCode)
-	ioutil.WriteFile(options.OutputDBName, persistenceByteCode, 0644)
 
 	//
 	// Create DB Create/Alter script - this is dumped to STDOUT
 	//
 	dbGenerator := options.Language.GetDBCreateGenerator()
-	var dbCreateCode = dbGenerator.GenerateCode(doc, options)
-	if options.Verbose > 0 {
-		log.Printf("dbCreateCode:\n")
+	if dbGenerator != nil {
+		var dbCreateCode = dbGenerator.GenerateCode(doc, options)
+		if options.Verbose > 0 {
+			log.Printf("dbCreateCode:\n")
+		}
+		fmt.Printf("%s\n", dbCreateCode)
+	} else {
+		log.Printf("No DB Script Generator\n")
 	}
-	fmt.Printf("%s\n", dbCreateCode)
 }
 
 func printHelp() {
@@ -157,6 +165,11 @@ func getLanguage(name string) common.Language {
 	case "golang":
 		log.Printf("Creating generators for GO\n")
 		return golang.CreateGoLanguage()
+	case "cpp":
+		fallthrough
+	case "c++":
+		log.Printf("Creating generators for C++\n")
+		return cpp.CreateCppLanguage()
 	}
 	log.Fatalf("No support for language: %s\n", name)
 	return nil
@@ -262,7 +275,10 @@ func main() {
 		log.Printf("Generating from version: %d\n", options.FromVersion)
 	}
 
-	options.Language = getLanguage("go")
+	options.Language = getLanguage("cpp")
+	if options.Language == nil {
+		log.Fatalf("No implementation for selected language\n")
+	}
 
 	//fmt.Printf("Processing file: %s\n", filename)
 	//fmt.Println("Unmarshal XML")
