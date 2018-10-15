@@ -1,4 +1,4 @@
-package main
+package mysql
 
 //
 // Generates persistence base code for the POGO class
@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"modelgenerator/common"
 	"strings"
 )
 
@@ -19,20 +20,22 @@ var createRetrieveFuncPostfix = false
 
 // func generatePersistenceCode(doc XMLDoc, className string, source string, splitInFiles bool, converters bool, verbose int, outputDir string) string {
 
-func generatePersistenceCode(doc XMLDoc, options *Options) string {
+func (generator *CrudGenerator) GenerateCode(doc common.XMLDoc, options *common.Options) string {
 	code := ""
-	if options.Converters {
-		doc.Imports = addImport(&doc, "bytes")         //append(doc.Imports, "bytes")
-		doc.Imports = addImport(&doc, "encoding/json") //append(doc.Imports, "encoding/json")
-		doc.Imports = addImport(&doc, "encoding/xml")  //append(doc.Imports, "encoding/xml")
 
-		// doc.Imports = append(doc.Imports, "bytes")
-		// doc.Imports = append(doc.Imports, "encoding/json")
-		// doc.Imports = append(doc.Imports, "encoding/xml")
-	}
+	/*
+		if options.Converters {
+			generator.addImport(&doc, "bytes")         //append(doc.Imports, "bytes")
+			generator.addImport(&doc, "encoding/json") //append(doc.Imports, "encoding/json")
+			generator.addImport(&doc, "encoding/xml")  //append(doc.Imports, "encoding/xml")
 
+			// doc.Imports = append(doc.Imports, "bytes")
+			// doc.Imports = append(doc.Imports, "encoding/json")
+			// doc.Imports = append(doc.Imports, "encoding/xml")
+		}
+	*/
 	if options.SplitInFiles != true {
-		code += generatePersistenceHeader(doc, options)
+		code += generator.generatePersistenceHeader(doc, options)
 		// generate code for all defines
 		for i := 0; i < len(doc.Defines); i++ {
 			if doc.Defines[i].SkipPersistance == true {
@@ -41,10 +44,10 @@ func generatePersistenceCode(doc XMLDoc, options *Options) string {
 			}
 			if strings.Compare(options.PersistenceClass, "-") != 0 {
 				for j := 0; j < len(options.AllPersistenceClasses); j++ {
-					code += doc.Defines[i].generatePersistenceCode(options, options.AllPersistenceClasses[j], options.Converters)
+					code += generatePersistenceCodeForDefine(&doc.Defines[i], options, options.AllPersistenceClasses[j], options.Converters)
 				}
 			} else {
-				code += doc.Defines[i].generatePersistenceCode(options, options.PersistenceClass, options.Converters)
+				code += generatePersistenceCodeForDefine(&doc.Defines[i], options, options.PersistenceClass, options.Converters)
 			}
 		}
 	} else {
@@ -53,8 +56,8 @@ func generatePersistenceCode(doc XMLDoc, options *Options) string {
 		// generate code for all defines
 		for _, define := range doc.Defines {
 			code := ""
-			code += generatePersistenceHeader(doc, options)
-			code += define.generatePersistenceCode(options, options.PersistenceClass, options.Converters)
+			code += generator.generatePersistenceHeader(doc, options)
+			code += generatePersistenceCodeForDefine(&define, options, options.PersistenceClass, options.Converters)
 			outputDir := options.OutputDBName
 			if string(outputDir[len(outputDir)-1:]) != "/" {
 				outputDir += "/"
@@ -70,7 +73,14 @@ func generatePersistenceCode(doc XMLDoc, options *Options) string {
 	return code
 }
 
-func generatePersistenceHeader(doc XMLDoc, options *Options) string {
+// func (generator *CrudGenerator) addImport(pkgName string) {
+// 	generator.Imports = append(generator.Imports, common.XMLImport{
+// 		DisablePersistence: false,
+// 		Package:            pkgName,
+// 	})
+// }
+
+func (generator *CrudGenerator) generatePersistenceHeader(doc common.XMLDoc, options *common.Options) string {
 
 	code := ""
 	code += fmt.Sprintf("package %s\n", doc.Namespace)
@@ -169,7 +179,7 @@ func generatePersistenceHeader(doc XMLDoc, options *Options) string {
 	return code
 }
 
-func (define *XMLDefine) generatePersistenceCode(options *Options, className string, converters bool) string {
+func generatePersistenceCodeForDefine(define *common.XMLDefine, options *common.Options, className string, converters bool) string {
 
 	// Check if class name matches - perhaps use regexp here..
 	if strings.Compare(className, "-") != 0 {
@@ -193,11 +203,11 @@ func (define *XMLDefine) generatePersistenceCode(options *Options, className str
 	//fmt.Printf("Generating code for type='%s', named='%s'\n", define.Type, define.Name)
 	switch define.Type {
 	case "class":
-		code += define.generatePersistenceCreateCode()
-		code += define.generatePersistenceFetchCode()
-		code += define.generatePersistenceRetrieveCode()
-		code += define.generatePersistenceUpdateCode()
-		code += define.generatePersistenceDeleteCode()
+		code += generatePersistenceCreateCode(define)
+		code += generatePersistenceFetchCode(define)
+		code += generatePersistenceRetrieveCode(define)
+		code += generatePersistenceUpdateCode(define)
+		code += generatePersistenceDeleteCode(define)
 		// if converters {
 		// 	code += define.generateClassConverters()
 		// }
@@ -231,30 +241,43 @@ func generateErrorCheckUserReturn(retval string) string {
 	return code
 }
 
-func (define *XMLDefine) lastPersistedMethodName() string {
+// func lastPersistedMethodName(define *common.XMLDefine) string {
+// 	lastName := ""
+// 	for _, f := range define.Methods {
+// 		if f.noPersist == true {
+// 			continue
+// 		}
+// 		lastName = f.Name
+// 	}
+// 	return lastName
+
+// }
+
+func lastFieldName(define *common.XMLDefine) string {
 	lastName := ""
-	for _, f := range define.Methods {
-		if f.noPersist == true {
+	for _, f := range define.Fields {
+		if f.SkipPersistance == true {
 			continue
 		}
 		lastName = f.Name
 	}
 	return lastName
-
 }
 
-func (define *XMLDefine) getSchemaName() string {
+func getSchemaName(define *common.XMLDefine) string {
 	return (fmt.Sprintf("DB_SCHEMA_%s", strings.ToUpper(define.Name)))
 }
 
-func (define *XMLDefine) generatePersistenceReadWriteVarList(varName string, skipAutoID bool) string {
+func generatePersistenceReadWriteVarList(define *common.XMLDefine, varName string, skipAutoID bool) string {
 	code := ""
-	lastName := define.lastPersistedMethodName()
-	for _, f := range define.Methods {
-		if f.noPersist == true {
+
+	lastName := lastFieldName(define)
+
+	for _, f := range define.Fields {
+		if f.SkipPersistance == true {
 			continue
 		}
-		if (f.autoID == true) && (skipAutoID == true) {
+		if (f.DBAutoID == true) && (skipAutoID == true) {
 			continue
 		}
 		if strings.Compare(f.Name, lastName) != 0 {
@@ -263,11 +286,26 @@ func (define *XMLDefine) generatePersistenceReadWriteVarList(varName string, ski
 			code += fmt.Sprintf("      %s.%s)\n", varName, f.Name)
 		}
 	}
+
+	// TODO: Shit should not work on methods..
+	// for _, f := range define.Methods {
+	// 	if f.NoPersist == true {
+	// 		continue
+	// 	}
+	// 	if (f.DBAutoID == true) && (skipAutoID == true) {
+	// 		continue
+	// 	}
+	// 	if strings.Compare(f.Name, lastName) != 0 {
+	// 		code += fmt.Sprintf("      %s.%s,\n", varName, f.Name)
+	// 	} else {
+	// 		code += fmt.Sprintf("      %s.%s)\n", varName, f.Name)
+	// 	}
+	// }
 	code += fmt.Sprintf("\n")
 	return code
 }
 
-func (define *XMLDefine) generatePersistenceCreateCode() string {
+func generatePersistenceCreateCode(define *common.XMLDefine) string {
 
 	code := ""
 
@@ -287,18 +325,11 @@ func (define *XMLDefine) generatePersistenceCreateCode() string {
 	//lastName := define.lastPersistedMethodName()
 
 	haveAtleastOneField := false
-
-	for _, f := range define.Methods {
-		// log.Printf(" Method: %s\n", f.Name)
-		if f.noPersist == true {
+	for _, f := range define.Fields {
+		if f.SkipPersistance == true {
 			continue
 		}
-		//		lastName = f.Name // preserve for next round
 		dbFieldName := strings.ToLower(f.Name)
-
-		// log.Printf("   dbFieldName: %s\n", dbFieldName)
-		// log.Printf("   primaryFieldName: %s\n", primaryFieldName)
-
 		if strings.Compare(primaryFieldName, dbFieldName) != 0 {
 			code += fmt.Sprintf("%s=?,", dbFieldName)
 			haveAtleastOneField = true
@@ -314,7 +345,7 @@ func (define *XMLDefine) generatePersistenceCreateCode() string {
 	code += fmt.Sprintf("\"\n")
 	code += fmt.Sprintf("\n")
 
-	schemaName := define.getSchemaName() //fmt.Sprintf("DB_SCHEMA_%s", strings.ToUpper(define.Name))
+	schemaName := getSchemaName(define) //fmt.Sprintf("DB_SCHEMA_%s", strings.ToUpper(define.Name))
 
 	methodName := fmt.Sprintf("Create%s", define.Name)
 	code += fmt.Sprintf("// %s creates a record in the DB\n", methodName)
@@ -328,7 +359,7 @@ func (define *XMLDefine) generatePersistenceCreateCode() string {
 	}
 	code += fmt.Sprintf("  _, err = stmt.Exec(\n")
 	//log.Println("lastName: ", lastName)
-	code += define.generatePersistenceReadWriteVarList("obj", true)
+	code += generatePersistenceReadWriteVarList(define, "obj", true)
 	code += generateErrorCheck()
 	code += fmt.Sprintf("  return nil\n")
 	code += fmt.Sprintf("}\n")
@@ -337,7 +368,7 @@ func (define *XMLDefine) generatePersistenceCreateCode() string {
 	return code
 }
 
-func (define *XMLDefine) generatePersistenceFetchCode() string {
+func generatePersistenceFetchCode(define *common.XMLDefine) string {
 	code := ""
 
 	if createRetrieveFuncPostfix == false {
@@ -355,7 +386,7 @@ func (define *XMLDefine) generatePersistenceFetchCode() string {
 	code += fmt.Sprintf("  for rows.Next() {\n")
 	code += fmt.Sprintf("    res := %s{}\n", define.Name)
 	code += fmt.Sprintf("    err := rows.Scan(\n")
-	code += define.generatePersistenceReadWriteVarList("&res", false)
+	code += generatePersistenceReadWriteVarList(define, "&res", false)
 	code += generateErrorCheckUserReturn("nil")
 	code += fmt.Sprintf("    list = append(list, res)\n")
 	code += fmt.Sprintf("  }\n")
@@ -365,13 +396,13 @@ func (define *XMLDefine) generatePersistenceFetchCode() string {
 
 	return code
 }
-func (define *XMLDefine) generatePersistenceRetrieveCode() string {
+func generatePersistenceRetrieveCode(define *common.XMLDefine) string {
 	code := ""
 
 	//fieldname := strings.ToLower(define.Name) + "id"
 	fieldname := strings.ToLower(define.Fields[0].Name)
 
-	schemaName := define.getSchemaName() // fmt.Sprintf("DB_SCHEMA_%s", strings.ToUpper(define.Name))
+	schemaName := getSchemaName(define) // fmt.Sprintf("DB_SCHEMA_%s", strings.ToUpper(define.Name))
 
 	methodName := fmt.Sprintf("Retrieve%sFromID", define.Name)
 	code += fmt.Sprintf("// %s Retrieves a single record in the DB matching supplied ID\n", methodName)
@@ -398,12 +429,12 @@ func (define *XMLDefine) generatePersistenceRetrieveCode() string {
 
 	return code
 }
-func (define *XMLDefine) generatePersistenceUpdateCode() string {
+func generatePersistenceUpdateCode(define *common.XMLDefine) string {
 	code := ""
 	//fieldname := strings.ToLower(define.Name) + "id"
 	fieldname := strings.ToLower(define.Fields[0].Name)
 
-	schemaName := define.getSchemaName() //fmt.Sprintf("DB_SCHEMA_%s", strings.ToUpper(define.Name))
+	schemaName := getSchemaName(define) //fmt.Sprintf("DB_SCHEMA_%s", strings.ToUpper(define.Name))
 
 	code += fmt.Sprintf("var updateQuery%s = \"UPDATE \" + %s + \" SET \" + createUpdateVariables%s + \" WHERE %s=?\"\n", define.Name, schemaName, define.Name, fieldname)
 
@@ -417,8 +448,8 @@ func (define *XMLDefine) generatePersistenceUpdateCode() string {
 	//mainKeyField := fmt.Sprintf("%sID", define.Name)
 	mainKeyField := define.Fields[0].Name
 
-	for _, f := range define.Methods {
-		if f.noPersist == true {
+	for _, f := range define.Fields {
+		if f.SkipPersistance == true {
 			continue
 		}
 		if strings.Compare(f.Name, mainKeyField) != 0 {
@@ -435,12 +466,12 @@ func (define *XMLDefine) generatePersistenceUpdateCode() string {
 	return code
 }
 
-func (define *XMLDefine) generatePersistenceDeleteCode() string {
+func generatePersistenceDeleteCode(define *common.XMLDefine) string {
 	code := ""
 
 	//fieldname := strings.ToLower(define.Name) + "id"
 	fieldname := strings.ToLower(define.Fields[0].Name)
-	schemaName := define.getSchemaName() //fmt.Sprintf("DB_SCHEMA_%s", strings.ToUpper(define.Name))
+	schemaName := getSchemaName(define) //fmt.Sprintf("DB_SCHEMA_%s", strings.ToUpper(define.Name))
 	mainKeyField := fmt.Sprintf("%sID", define.Name)
 
 	code += fmt.Sprintf("var deleteQuery%s = \"DELETE FROM \" + %s + \" WHERE %s=?\"\n", define.Name, schemaName, fieldname)

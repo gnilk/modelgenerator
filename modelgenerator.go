@@ -12,145 +12,22 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strconv"
 	"strings"
+
+	"modelgenerator/common"
+	golang "modelgenerator/generators/golang"
+	"modelgenerator/generators/mysql"
 )
 
-//
-// Options for generator, takem from command line
-//
-type Options struct {
-	SplitInFiles          bool
-	DBTablePrefix         string
-	Converters            bool
-	Verbose               int
-	Filename              string
-	OutputName            string
-	OutputDBName          string
-	AllPersistenceClasses []string
-	PersistenceClass      string
-	DoPersistence         bool
-	IsUpgrade             bool
-	GenerateDropStatement bool
-	FromVersion           int    // Always assume from version 0
-	DocumentRootDirectory string // This is set by code to the root directory of the first document, relative for all includes
-	CurrentDoc            *XMLDoc
-}
+const Name = "ModelGenerator"
+const Version = "2.1"
 
 //
-// Reflection type name prefix
+// Load's an XML document an preprocess (load and merge any include directive)
 //
-var xmlTypePrefix = "main."
-
-//
-// XML Import structures
-//
-
-type XMLDBControl struct {
-	Host     string `xml:"host"`
-	DBName   string `xml:"dbname"`
-	User     string `xml:"user"`
-	Password string `xml:"password"`
-}
-
-// XMLDataTypeField declares a variable in an definition (see XmlDefine)
-type XMLDataTypeField struct {
-	Name            string `xml:"name,attr"`
-	Default         string `xml:"default,attr"`
-	Value           int    `xml:"value,attr"`
-	DBSize          int    `xml:"dbsize,attr"`
-	FieldSize       int    `xml:"fieldsize,attr"`
-	Type            string `xml:"type,attr"`
-	IsPointer       bool   `xml:"ispointer,attr"`
-	IsList          bool   `xml:"islist,attr"`
-	FromVersion     int    `xml:"fromversion,attr"`
-	SkipPersistance bool   `xml:"nopersist,attr"`
-	DBAutoID        bool   `xml:"dbautoid,attr"`
-}
-
-// XMLDefine declares an object (type/struct)
-type XMLDefine struct {
-	Type            string             `xml:"type,attr"`
-	Name            string             `xml:"name,attr"`
-	Inherits        string             `xml:"inherits,attr"`
-	DBSchema        string             `xml:"dbschema,attr"`
-	SkipPersistance bool               `xml:"nopersist,attr"`
-	Fields          []XMLDataTypeField `xml:"field"`
-	Guids           []XMLDataTypeField `xml:"guid"`
-	Strings         []XMLDataTypeField `xml:"string"`
-	Bools           []XMLDataTypeField `xml:"bool"`
-	Times           []XMLDataTypeField `xml:"time"`
-	Ints            []XMLDataTypeField `xml:"int"`
-	Lists           []XMLDataTypeField `xml:"list"`
-	Objects         []XMLDataTypeField `xml:"object"`
-	Enums           []XMLDataTypeField `xml:"enum"`
-
-	// private stuff
-	Methods []AccessMethod
-}
-
-// XMLImport holds import directives
-type XMLImport struct {
-	DisablePersistence bool   `xml:"no_persistence,attr"`
-	Package            string `xml:",innerxml"`
-}
-
-// XMLTypeMapping Holds type mappings definitions
-type XMLTypeMapping struct {
-	FromType  string `xml:"from,attr"`
-	ToType    string `xml:"to,attr"`
-	FieldSize int    `xml:"fieldsize,attr"`
-}
-
-type XMLInclude struct {
-	Filename string `xml:",innerxml"`
-	document XMLDoc
-}
-
-// XMLDoc holds the document root
-type XMLDoc struct {
-	Namespace      string           `xml:"namespace,attr"`
-	DBSchema       string           `xml:"dbschema,attr"`
-	Includes       []XMLInclude     `xml:"include"`
-	Imports        []XMLImport      `xml:"imports>package"`
-	Defines        []XMLDefine      `xml:"define"`
-	DBTypeMappings []XMLTypeMapping `xml:"dbtypemappings>map"`
-	GOTypeMappings []XMLTypeMapping `xml:"gotypemappings>map"`
-	DBControl      XMLDBControl     `xml:"dbcontrol"`
-}
-
-//
-// Internal structures
-//
-
-// XMLToGoTypeTranslation defines the translation between XML types and GO types
-var XMLToGoTypeTranslation = map[string]string{
-	"XmlString": "string",
-	"XmlTime":   "time",
-	"XmlGuid":   "guid",
-	"XmlObject": "object",
-	"XmlList":   "list",
-	"XmlInt":    "int",
-}
-
-//
-// Meta info for structure access methods (getter/setters)
-//
-
-type AccessMethod struct {
-	getter    bool
-	setter    bool
-	isList    bool
-	isPointer bool
-	noPersist bool
-	autoID    bool
-	Name      string
-	Type      string
-}
-
-func loadDocument(options *Options, Filename string) (XMLDoc, error) {
-	var doc XMLDoc
+func loadDocument(options *common.Options, Filename string) (common.XMLDoc, error) {
+	var doc common.XMLDoc
 
 	xmlData, err := ioutil.ReadFile(Filename)
 	if err != nil {
@@ -167,7 +44,7 @@ func loadDocument(options *Options, Filename string) (XMLDoc, error) {
 	return doc, nil
 }
 
-func preprocessDocument(options *Options, doc *XMLDoc) {
+func preprocessDocument(options *common.Options, doc *common.XMLDoc) {
 	for _, include := range doc.Includes {
 		incPathName := filepath.Join(options.DocumentRootDirectory, include.Filename)
 
@@ -182,12 +59,12 @@ func preprocessDocument(options *Options, doc *XMLDoc) {
 			log.Fatalf("Unable to include file: %s (%s)\n", include.Filename, incPathName)
 			return
 		}
-		include.document = incDoc
+		include.Document = incDoc
 		mergeDocuments(doc, &incDoc)
 	}
 }
 
-func mergeDocuments(dst *XMLDoc, src *XMLDoc) *XMLDoc {
+func mergeDocuments(dst *common.XMLDoc, src *common.XMLDoc) *common.XMLDoc {
 	//
 	// Note: We don't merge includes!!!
 	//
@@ -207,458 +84,54 @@ func mergeDocuments(dst *XMLDoc, src *XMLDoc) *XMLDoc {
 	if src.DBControl.User != "" {
 		dst.DBControl.User = src.DBControl.User
 	}
-	//	dst.DBControl = src.DBControl
 
 	return dst
 }
 
-func translateXMLType(xmlType interface{}) (string, string) {
-	//reflect.TypeOf(xmlType).Name
-	//return strings.TrimPrefix(reflect.TypeOf(xmlType).String(), xmlTypePrefix)
+//
+// Generate domain model for selected language
+//
+func generateLanguageModel(options *common.Options, doc common.XMLDoc) {
 
-	var xmlTypeName = reflect.TypeOf(xmlType).Name()
-	var goTypeName = XMLToGoTypeTranslation[xmlTypeName]
+	codeGenerator := golang.CreateGoLangGenerator()
+	code := codeGenerator.GenerateCode(doc, options)
 
-	return goTypeName, xmlTypeName
-
-}
-
-func (field *XMLDataTypeField) dump() {
-	fmt.Printf("  Name: %s\n", field.Name)
-	fmt.Printf("  Default: %s\n", field.Default)
-}
-
-func (define *XMLDefine) generateCode(options *Options, converters bool) string {
-
-	code := ""
-	//fmt.Printf("Generating code for type='%s', named='%s'\n", define.Type, define.Name)
-	switch define.Type {
-	case "class":
-		code += define.generateClassCode(options)
-		if converters {
-			code += define.generateClassConverters()
-		}
-		break
-	case "enum":
-		code += define.generateEnumCode()
-		break
-	default:
-		fmt.Printf("[XMLDefine::generateCode] Error, can't generate code for type '%s'\n", define.Type)
-		break
-	}
-
-	return code
-}
-
-func (define *XMLDefine) generateClassCode(options *Options) string {
-	code := ""
-
-	code += fmt.Sprintf("//\n")
-	code += fmt.Sprintf("// %s is generated\n", define.Name)
-	code += fmt.Sprintf("//\n")
-
-	code += fmt.Sprintf("type %s struct {\n", define.Name)
-
-	if define.Inherits != "" {
-		code += fmt.Sprintf("  %s\n\n", define.Inherits)
-	}
-
-	code += define.generateFields(options, define.Fields)
-
-	// code += define.generateFieldCode(define.Guids, "uuid.UUID")
-	// code += define.generateFieldCode(define.Strings, "string")
-	// code += define.generateFieldCode(define.Ints, "int")
-	// code += define.generateFieldCode(define.Bools, "bool")
-	// // TODO: Fix this!!
-	// code += define.generateFieldCode(define.Times, "time.Time")
-	// code += define.generateFieldListCode(define.Lists)
-	// code += define.generateFieldEnumCode(define.Enums)
-	// code += define.generateFieldObjectCode(define.Objects)
-	code += fmt.Sprintf("}\n")
-	code += fmt.Sprintf("\n")
-
-	for _, method := range define.Methods {
-		ptrAttrib := "*"
-		if method.isPointer != true {
-			ptrAttrib = ""
-		}
-
-		if method.getter == true {
-			if method.isList != true {
-				code += fmt.Sprintf("func (this *%s) Get%s() %s%s {\n", define.Name, method.Name, ptrAttrib, method.Type)
-				code += fmt.Sprintf("  return this.%s\n", method.Name)
-				code += fmt.Sprintf("}\n")
-				code += fmt.Sprintf("\n")
-			} else {
-				code += fmt.Sprintf("func (this *%s) Get%sAsRef() []%s%s {\n", define.Name, method.Name, ptrAttrib, method.Type)
-				code += fmt.Sprintf("  return this.%s[:len(this.%s)]\n", method.Name, method.Name)
-				code += fmt.Sprintf("}\n")
-				code += fmt.Sprintf("\n")
-
-				code += fmt.Sprintf("func (this *%s) Get%sAsCopy() []%s%s {\n", define.Name, method.Name, ptrAttrib, method.Type)
-				code += fmt.Sprintf("  newSlice := make([]%s, len(this.%s))\n", method.Type, method.Name)
-				code += fmt.Sprintf("  copy(newSlice, this.%s)\n", method.Name)
-				code += fmt.Sprintf("  return newSlice\n")
-				code += fmt.Sprintf("}\n")
-				code += fmt.Sprintf("\n")
-			}
-		}
-
-		if method.setter == true {
-			if method.isList != true {
-				code += fmt.Sprintf("func (this *%s) Set%s(value %s%s) {\n", define.Name, method.Name, ptrAttrib, method.Type)
-				code += fmt.Sprintf("  this.%s = value\n", method.Name)
-				code += fmt.Sprintf("}\n")
-				code += fmt.Sprintf("\n")
-			} else {
-				code += fmt.Sprintf("func (this *%s) Set%s(value []%s%s) {\n", define.Name, method.Name, ptrAttrib, method.Type)
-				code += fmt.Sprintf("  this.%s = make([]%s, len(value))\n", method.Name, method.Type)
-				code += fmt.Sprintf("  copy(this.%s, value)\n", method.Name)
-				code += fmt.Sprintf("}\n")
-				code += fmt.Sprintf("\n")
-			}
-		}
-	}
-
-	return code
-}
-
-func (define *XMLDefine) generateClassConverters() string {
-	code := ""
-
-	code += define.generateToJSONCode()
-	code += fmt.Sprintf("\n")
-	code += define.generateToXMLCode()
-	code += fmt.Sprintf("\n")
-
-	code += define.generateFromJSONCode()
-	code += fmt.Sprintf("\n")
-	code += define.generateFromXMLCode()
-	code += fmt.Sprintf("\n")
-	return code
-}
-
-func (define *XMLDefine) generateToJSONCode() string {
-	code := ""
-	code += fmt.Sprintf("// ToJSON creates a JSON representation of the data for the type\n")
-	code += fmt.Sprintf("func (this *%s) ToJSON() string {\n", define.Name)
-
-	code += fmt.Sprintf("  b, err := json.MarshalIndent(this, \"\", \"    \")\n")
-	code += fmt.Sprintf("  if err != nil {\n")
-	code += fmt.Sprintf("    return \"\"\n")
-	code += fmt.Sprintf("  }\n")
-	code += fmt.Sprintf("  return bytes.NewBuffer(b).String()\n")
-	code += fmt.Sprintf("}\n")
-
-	// code += fmt.Sprintf("  b := new(bytes.Buffer)\n")
-	// code += fmt.Sprintf("  encoder := json.NewEncoder(b)\n")
-	// code += fmt.Sprintf("  encoder.SetIndent(\"\", \"    \")\n")
-	// code += fmt.Sprintf("  err := encoder.Encode(this)\n")
-	// code += fmt.Sprintf("  if err != nil {\n")
-	// code += fmt.Sprintf("    return \"\"\n")
-	// code += fmt.Sprintf("  }\n")
-	// code += fmt.Sprintf("  return b.String()\n")
-	return code
-}
-
-func (define *XMLDefine) generateToXMLCode() string {
-	code := ""
-	code += fmt.Sprintf("// ToXML creates an XML representation of the data for the type\n")
-	code += fmt.Sprintf("func (this *%s) ToXML() string {\n", define.Name)
-
-	code += fmt.Sprintf("  b, err := xml.MarshalIndent(this, \"\", \"    \")\n")
-	code += fmt.Sprintf("  if err != nil {\n")
-	code += fmt.Sprintf("    return \"\"\n")
-	code += fmt.Sprintf("  }\n")
-	code += fmt.Sprintf("  return bytes.NewBuffer(b).String()\n")
-	code += fmt.Sprintf("}\n")
-
-	// code += fmt.Sprintf("  b := new(bytes.Buffer)\n")
-	// code += fmt.Sprintf("  encoder := xml.NewEncoder(b)\n")
-	// code += fmt.Sprintf("  encoder.Indent(\"\", \"    \")\n")
-	// code += fmt.Sprintf("  err := encoder.Encode(this)\n")
-	// code += fmt.Sprintf("  if err != nil {\n")
-	// code += fmt.Sprintf("    return \"\"\n")
-	// code += fmt.Sprintf("  }\n")
-	// code += fmt.Sprintf("  return b.String()\n")
-	return code
-}
-
-func (define *XMLDefine) generateFromXMLCode() string {
-	code := ""
-
-	code += fmt.Sprintf("// %sFromXML converts an XML representation to the type\n", define.Name)
-	code += fmt.Sprintf("func %sFromXML(xmldata string) (*%s, error) {\n", define.Name, define.Name)
-	code += fmt.Sprintf("  var value %s\n", define.Name)
-	code += fmt.Sprintf("  err := xml.Unmarshal([]byte(xmldata), &value)\n")
-	code += fmt.Sprintf("  if err != nil {\n")
-	code += fmt.Sprintf("	  return nil, err\n")
-	code += fmt.Sprintf("  }\n")
-	code += fmt.Sprintf("  return &value, nil\n")
-	code += fmt.Sprintf("}\n")
-
-	return code
-
-	// -- Original code (this is what it should be)
-	// func UserFromXML(xmldata string) (*User, error) {
-	// 	var user User
-	// 	err := xml.Unmarshal([]byte(xmldata), &user)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	return &user, nil
-	// }
-
-}
-
-func (define *XMLDefine) generateFromJSONCode() string {
-	code := ""
-
-	code += fmt.Sprintf("// %sFromJSON converts a JSON representation to the data type\n", define.Name)
-	code += fmt.Sprintf("func %sFromJSON(jsondata string) (*%s, error) {\n", define.Name, define.Name)
-	code += fmt.Sprintf("  var value %s\n", define.Name)
-	code += fmt.Sprintf("  err := json.Unmarshal([]byte(jsondata), &value)\n")
-	code += fmt.Sprintf("  if err != nil {\n")
-	code += fmt.Sprintf("	  return nil, err\n")
-	code += fmt.Sprintf("  }\n")
-	code += fmt.Sprintf("  return &value, nil\n")
-	code += fmt.Sprintf("}\n")
-	return code
-
-	// -- original code
-	// func UserFromJSON(jsondata string) (*User, error) {
-	// 	var user User
-	// 	err := json.Unmarshal([]byte(jsondata), &user)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	return &user, nil
-	// }
-}
-
-func (define *XMLDefine) methodFromField(field XMLDataTypeField, typeString string, isList bool) {
-	method := AccessMethod{
-		getter:    true,
-		setter:    true,
-		isList:    isList,
-		Name:      field.Name,
-		Type:      typeString,
-		isPointer: field.IsPointer,
-		noPersist: field.SkipPersistance,
-		autoID:    field.DBAutoID,
-	}
-
-	define.Methods = append(define.Methods, method)
-}
-
-// TypeMapping maps a field's type to potential mappings from the specific table
-func (field *XMLDataTypeField) TypeMapping(typeMappings []XMLTypeMapping) string {
-	for _, mapping := range typeMappings {
-		if mapping.FromType == field.Type {
-			// If this is not specified, assume the type mapping does not require it
-			if mapping.FieldSize == 0 {
-				return mapping.ToType
-			}
-			fs := field.FieldSize // Assume field has this defined
-			if fs == 0 {
-				fs = mapping.FieldSize
-			}
-			return fmt.Sprintf(mapping.ToType, fs)
-
-		}
-	}
-	return field.Type
-}
-
-func (field *XMLDataTypeField) goFieldCode(options *Options) string {
-	code := ""
-
-	typePrefix := ""
-	if field.IsList {
-		typePrefix = typePrefix + "[]"
-	}
-	if field.IsPointer {
-		typePrefix = typePrefix + "*"
-	}
-	code += fmt.Sprintf("  %s %s%s\n", field.Name, typePrefix, field.TypeMapping(options.CurrentDoc.GOTypeMappings))
-
-	return code
-}
-
-func (define *XMLDefine) generateFields(options *Options, list []XMLDataTypeField) string {
-	code := ""
-
-	for _, field := range list {
-		code += field.goFieldCode(options)
-		define.methodFromField(field, field.TypeMapping(options.CurrentDoc.GOTypeMappings), field.IsList)
-	}
-
-	return code
-}
-
-// generateEnumCode creates Go Code for an ENUM const declaration
-func (define *XMLDefine) generateEnumCode() string {
-	code := ""
-	code += fmt.Sprintf("type %s int64\n", define.Name)
-	code += fmt.Sprintf("const (\n")
-	code += fmt.Sprintf("  _ = iota\n")
-	for _, Int := range define.Ints {
-		code += fmt.Sprintf("  %s %s = %d\n", Int.Name, define.Name, Int.Value)
-	}
-	code += fmt.Sprintf(")\n")
-	code += fmt.Sprintf("\n")
-
-	code += fmt.Sprintf("var map%sToName = map[%s]string {\n", define.Name, define.Name)
-	for _, Int := range define.Ints {
-		code += fmt.Sprintf("  %d:\"%s\",\n", Int.Value, Int.Name)
-	}
-	code += fmt.Sprintf("}\n")
-	code += fmt.Sprintf("\n")
-
-	code += fmt.Sprintf("var map%sToValue = map[string]%s {\n", define.Name, define.Name)
-	for _, Int := range define.Ints {
-		code += fmt.Sprintf("  \"%s\":%d,\n", Int.Name, Int.Value)
-	}
-	code += fmt.Sprintf("}\n")
-	code += fmt.Sprintf("\n")
-
-	// todo generate map here
-
-	code += fmt.Sprintf("func (this *%s) String() string {\n", define.Name)
-	code += fmt.Sprintf("  return map%sToName[*this]\n", define.Name)
-	code += fmt.Sprintf("}\n")
-	code += fmt.Sprintf("\n")
-
-	code += fmt.Sprintf("func (this %s) MarshalJSON() ([]byte, error) {\n", define.Name)
-	code += fmt.Sprintf("  return json.Marshal(this.String())\n")
-	code += fmt.Sprintf("}\n")
-	code += fmt.Sprintf("\n")
-
-	code += fmt.Sprintf("func (this *%s) UnmarshalJSON(data []byte) error {\n", define.Name)
-	code += fmt.Sprintf("  var s string\n")
-	code += fmt.Sprintf("  if err := json.Unmarshal(data, &s); err != nil {\n")
-	code += fmt.Sprintf("    return fmt.Errorf(\"%s should be a string\")\n", define.Name)
-	code += fmt.Sprintf("  }\n")
-	code += fmt.Sprintf("  v, ok := map%sToValue[s]\n", define.Name)
-	code += fmt.Sprintf("  if !ok {\n")
-	code += fmt.Sprintf("    return fmt.Errorf(\"invalid %s\")", define.Name)
-	code += fmt.Sprintf("  }\n")
-	code += fmt.Sprintf("  *this = v\n")
-	code += fmt.Sprintf("  return nil\n")
-	code += fmt.Sprintf("}")
-	code += fmt.Sprintf("\n")
-
-	return code
-}
-
-func (define *XMLDefine) dump() {
-	fmt.Printf("\nName: %s\n", define.Name)
-	fmt.Printf("  Type: %s\n", define.Type)
-	fmt.Printf("  Inherits: %s\n", define.Inherits)
-
-	fmt.Printf("  -- Fields --\n")
-
-	// process variables per type - is there a better way to do this????
-	for _, GUID := range define.Guids {
-		var s, x = translateXMLType(GUID)
-		fmt.Printf("  Type: %s (%s)\n", s, x)
-		GUID.dump()
-	}
-	for _, Str := range define.Strings {
-		var s, x = translateXMLType(Str)
-		fmt.Printf("  Type: %s (%s)\n", s, x)
-		Str.dump()
-	}
-	for _, Time := range define.Times {
-		var s, x = translateXMLType(Time)
-		fmt.Printf("  Type: %s (%s)\n", s, x)
-		Time.dump()
-	}
-
-	for _, Int := range define.Ints {
-		var s, x = translateXMLType(Int)
-		fmt.Printf("  Type: %s (%s)\n", s, x)
-		Int.dump()
-	}
-
-	for _, List := range define.Lists {
-		var s, x = translateXMLType(List)
-		fmt.Printf("  Type: %s (%s)\n", s, x)
-		List.dump()
-	}
-
-	for _, Object := range define.Objects {
-		var s, x = translateXMLType(Object)
-		fmt.Printf("  Type: %s (%s)\n", s, x)
-		Object.dump()
-	}
-
-}
-
-func dumpXMLDefinitions(doc XMLDoc) {
-	fmt.Printf("Dumping results\n")
-	fmt.Printf("Namespace: %s\n", doc.Namespace)
-
-	fmt.Printf("\nDefines\n")
-	fmt.Printf("-------\n")
-	for i := 0; i < len(doc.Defines); i++ {
-		doc.Defines[i].dump()
-	}
-}
-
-func dumpImports(doc XMLDoc) {
-	log.Printf("Imports: %d\n", len(doc.Imports))
-	for _, imp := range doc.Imports {
-		log.Printf("  %s\n", imp.Package)
+	if options.OutputName != "-" {
+		byteCode := []byte(code)
+		ioutil.WriteFile(options.OutputName, byteCode, 0644)
+	} else {
+		log.Printf("%s\n", code)
 	}
 }
 
 //
-// this generates the data model code...
+// generate persistence layer for selected language
 //
+func generatePersistence(options *common.Options, doc common.XMLDoc) {
+	crudGenerator := mysql.CreateCrudGenerator()
 
-func testReturnSliceRef(data []int) []int {
-	return data[:]
-}
-func testReturnSliceCopy(data []int) []int {
-	newSlice := make([]int, len(data))
-	copy(newSlice, data)
-	return newSlice
-}
+	if options.Verbose > 0 {
+		log.Printf("Generating persistence code, saving to '%s'", options.OutputDBName)
+		log.Printf("  DB Control: %v\n", doc.DBControl)
+	}
+	//var persistenceCode = generatePersistenceCode(doc, options.PersistenceClass, options.Filename, options.SplitInFiles, options.Converters, options.Verbose, options.OutputName)
+	var persistenceCode = crudGenerator.GenerateCode(doc, options)
+	persistenceByteCode := []byte(persistenceCode)
+	ioutil.WriteFile(options.OutputDBName, persistenceByteCode, 0644)
 
-func testSlices() {
-	data := []int{1, 2, 3, 4, 5}
-	fmt.Println("Slices with references")
-	fmt.Println("before")
-	fmt.Println(data)
-	data2 := testReturnSliceRef(data)
-	fmt.Println("after")
-	fmt.Println(data2)
-
-	data[0] = 9
-	fmt.Println("data")
-	fmt.Println(data)
-	fmt.Println("data2 - should be equal to first slice")
-	fmt.Println(data2)
-
-	data[0] = 1
-
-	fmt.Println("Slices with copy")
-	fmt.Println("before")
-	fmt.Println(data)
-	data3 := testReturnSliceCopy(data)
-	fmt.Println("after")
-	fmt.Println(data3)
-
-	data[0] = 9
-	fmt.Println("data")
-	fmt.Println(data)
-	fmt.Println("data3 - should be unchanged at first element")
-	fmt.Println(data3)
+	//
+	// Create DB Create/Alter script - this is dumped to STDOUT
+	//
+	dbGenerator := mysql.CreateDBGenerator()
+	var dbCreateCode = dbGenerator.GenerateCode(doc, options)
+	if options.Verbose > 0 {
+		log.Printf("dbCreateCode:\n")
+	}
+	fmt.Printf("%s\n", dbCreateCode)
 }
 
 func printHelp() {
-	fmt.Println("modelgenerator v2 - XML Data Model to GO structure converter")
+	fmt.Printf("%s %s - XML Data Model to Language structure converter\n", Name, Version)
 	fmt.Println("Usage: modelgenerator [-sv] [-p <class>] [-f <num>] [-o <file/dir>] <inputfile>")
 	fmt.Println("Options")
 	fmt.Println("  -f : From Version, generates any class/field matching >= specified version (0 means as virgin)")
@@ -667,7 +140,7 @@ func printHelp() {
 	fmt.Println("  -d : Generate drop statements before create (default = false)")
 	fmt.Println("  -s : split each type in separate file")
 	fmt.Println("  -c : generate convertes (to/from XML/JSON)")
-	fmt.Println("  -o : specify output model go file or dir (if split in multiplefiles is true), default is stdout")
+	fmt.Println("  -o : specify output model file or '-' for stdout (default) ")
 	fmt.Println("  -O : specify output database go file or dir (if split in multiplefiles is true), default is 'db.go'")
 	fmt.Println("  -v : increase verbose output (default 0 - none)")
 	fmt.Println("  -h : this page")
@@ -675,38 +148,14 @@ func printHelp() {
 	fmt.Println("")
 }
 
-func init() {
-
-	// const (
-	// 	fromversion_default = 0,
-	// 	fromversion_usage = "Changes DB Creation from assuming ALTER instead of CREATE, fields parsed based on >= 'fromversion' attribute",
-
-	// 	persistence_class_default = "-",
-	// 	persistence_class_usage = "Specifies explict class to generate persistence code for (default: '-', all)",
-
-	// 	outputname_default = "",
-	// 	outputname_usage = "Specifies output file or directory (if split in multiple is true), default is stdout",
-
-	// )
-
-	// flag.IntVar(&options.FromVersion, "-f", fromversion_default, fromversion_usage)
-	// flag.IntVar(&options.FromVersion, "--from_version", fromversion_default, fromversion_usage)
-	// flag.StringVar(&options.PersistenceClass, "-p", persistence_class_default, persistence_class_usage)
-	// flag.StringVar(&options.PersistenceClass, "--persistence_class", persistence_class_default, persistence_class_usage)
-
-	// flag.StringVar(&options.OutputName, "-o", outputname_default, outputname_usage)
-	// flag.StringVar(&options.OutputName, "--output", outputname_default, outputname_usage)
-
-}
-
 func main() {
-	options := Options{
+	options := common.Options{
 		SplitInFiles:          false,
 		Converters:            false,
 		Verbose:               0,
 		DBTablePrefix:         "nagini_se_",
 		Filename:              "",
-		OutputName:            "",
+		OutputName:            "-",
 		OutputDBName:          "db.go",
 		PersistenceClass:      "-",
 		AllPersistenceClasses: nil,
@@ -720,7 +169,7 @@ func main() {
 
 		for i := 0; i < len(os.Args); i++ {
 			arg := os.Args[i]
-			///fmt.Printf("Arg: %s\n", arg)
+			//log.Printf("Arg: %s\n", arg)
 			if arg[0] == '-' {
 				switch arg[1] {
 				case 's':
@@ -787,10 +236,14 @@ func main() {
 	options.DocumentRootDirectory = filepath.Dir(intputFilePath)
 
 	if options.Verbose > 0 {
+
+		log.Printf("%s %s\n", Name, Version)
+
 		log.Printf("Processing file: %s\n", options.Filename)
 		log.Printf("With root directory: %s\n", filepath.Dir(intputFilePath))
 		log.Printf("Generating from version: %d\n", options.FromVersion)
 	}
+
 	//fmt.Printf("Processing file: %s\n", filename)
 	//fmt.Println("Unmarshal XML")
 
@@ -806,41 +259,12 @@ func main() {
 	if options.Verbose > 0 {
 		log.Printf("DB Typemappoings: %d\n", len(doc.DBTypeMappings))
 		log.Printf("GO Typemappoings: %d\n", len(doc.GOTypeMappings))
-		dumpImports(doc)
-
 		log.Println("File read ok, generating data model code...")
 	}
-	//
-	// this generates the data model code
-	//
-	var code = generateCode(&options, doc, options.Filename, options.SplitInFiles, options.Converters, options.Verbose, options.OutputName)
-	if options.OutputName != "" {
-		byteCode := []byte(code)
-		ioutil.WriteFile(options.OutputName, byteCode, 0644)
-	} else {
-		log.Printf("%s\n", code)
-	}
+
+	generateLanguageModel(&options, doc)
 
 	if options.DoPersistence {
-		//
-		// this generates the persistence code
-		//
-		if options.Verbose > 0 {
-			log.Printf("Generating persistence code, saving to '%s'", options.OutputDBName)
-			log.Printf("  DB Control: %v\n", doc.DBControl)
-		}
-		//var persistenceCode = generatePersistenceCode(doc, options.PersistenceClass, options.Filename, options.SplitInFiles, options.Converters, options.Verbose, options.OutputName)
-		var persistenceCode = generatePersistenceCode(doc, &options)
-		persistenceByteCode := []byte(persistenceCode)
-		ioutil.WriteFile(options.OutputDBName, persistenceByteCode, 0644)
-
-		//
-		//
-		//
-		var dbCreateCode = generateDBCreateCode(doc, &options)
-		if options.Verbose > 0 {
-			log.Printf("dbCreateCode:\n")
-		}
-		fmt.Printf("%s\n", dbCreateCode)
+		generatePersistence(&options, doc)
 	}
 }

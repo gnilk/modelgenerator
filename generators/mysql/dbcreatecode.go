@@ -1,4 +1,4 @@
-package main
+package mysql
 
 //
 // Generates persistence base code for the POGO class
@@ -10,10 +10,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"modelgenerator/common"
 	"strings"
 )
 
-func generateDBCreateCode(doc XMLDoc, options *Options) string {
+func (generator *DBGenerator) GenerateCode(doc common.XMLDoc, options *common.Options) string {
 	code := ""
 
 	// className string, source string, splitInFiles bool, converters bool, verbose int, outputDir string
@@ -28,12 +29,12 @@ func generateDBCreateCode(doc XMLDoc, options *Options) string {
 			if strings.Compare(options.PersistenceClass, "-") != 0 {
 				for j := 0; j < len(options.AllPersistenceClasses); j++ {
 					options.PersistenceClass = options.AllPersistenceClasses[j]
-					code += doc.Defines[i].generateDBCreateCode(options)
+					code += generateDBCreateCodeForDefine(&doc.Defines[i], options)
 
 					//code += doc.Defines[i].generatePersistenceCode(options.AllPersistenceClasses[j], options.Converters)
 				}
 			} else {
-				code += doc.Defines[i].generateDBCreateCode(options)
+				code += generateDBCreateCodeForDefine(&doc.Defines[i], options)
 				//code += doc.Defines[i].generatePersistenceCode(options.PersistenceClass, options.Converters)
 			}
 
@@ -45,7 +46,7 @@ func generateDBCreateCode(doc XMLDoc, options *Options) string {
 	return code
 }
 
-func generateDBCreateHeader(doc XMLDoc, source string) string {
+func generateDBCreateHeader(doc common.XMLDoc, source string) string {
 	code := ""
 	if len(doc.DBControl.DBName) > 0 {
 		code = fmt.Sprintf("USE `%s`;\n", doc.DBControl.DBName)
@@ -56,25 +57,11 @@ func generateDBCreateHeader(doc XMLDoc, source string) string {
 	return code
 }
 
-func (field *XMLDataTypeField) getDBColumnName(options *Options) string {
-	return fmt.Sprintf("%s", strings.ToLower(field.Name))
-
-}
-
-func (field *XMLDataTypeField) additionalDBCreateStatement(options *Options) string {
-	res := ""
-
-	if field.DBAutoID {
-		res = res + " AUTO_INCREMENT"
-	}
-	return res
-}
-
-func (define *XMLDefine) getDBTableName(options *Options) string {
+func getDBTableName(define *common.XMLDefine, options *common.Options) string {
 	return fmt.Sprintf("%s%s", options.DBTablePrefix, strings.ToLower(define.Name))
 }
 
-func (define *XMLDefine) generateDBCreateCode(options *Options) string {
+func generateDBCreateCodeForDefine(define *common.XMLDefine, options *common.Options) string {
 	//options.PersistenceClass, options.Converters)
 	// Check if class name matches - perhaps use regexp here..
 	if strings.Compare(options.PersistenceClass, "-") != 0 {
@@ -91,7 +78,7 @@ func (define *XMLDefine) generateDBCreateCode(options *Options) string {
 
 	switch define.Type {
 	case "class":
-		code += define.generateDBCreateCodeForClass(options)
+		code += generateDBCreateCodeForClass(define, options)
 		break
 	default:
 		fmt.Printf("Error, can't generate code for type '%s'\n", define.Type)
@@ -101,18 +88,18 @@ func (define *XMLDefine) generateDBCreateCode(options *Options) string {
 	return code
 }
 
-func (define *XMLDefine) generateDBCreateCodeForClass(options *Options) string {
+func generateDBCreateCodeForClass(define *common.XMLDefine, options *common.Options) string {
 	code := "\n"
 
 	if options.GenerateDropStatement == true {
-		code += fmt.Sprintf("DROP TABLE IF EXISTS `%s`;\n", define.getDBTableName(options))
+		code += fmt.Sprintf("DROP TABLE IF EXISTS `%s`;\n", getDBTableName(define, options))
 	}
 
 	if options.IsUpgrade != true {
-		code += fmt.Sprintf("CREATE TABLE `%s` (\n", define.getDBTableName(options))
+		code += fmt.Sprintf("CREATE TABLE `%s` (\n", getDBTableName(define, options))
 	}
 
-	code += define.generateDBFieldCode(options)
+	code += generateDBFieldCode(define, options)
 	// code += define.generateDBCreateCodeForField(options, define.Guids, "varchar(36)", true)
 	// code += define.generateDBCreateCodeForStrings(options, define.Strings)
 	// code += define.generateDBCreateCodeForField(options, define.Ints, "int(11)", false)
@@ -132,7 +119,7 @@ func (define *XMLDefine) generateDBCreateCodeForClass(options *Options) string {
 	return code
 }
 
-func (define *XMLDefine) generateDBFieldCode(options *Options) string {
+func generateDBFieldCode(define *common.XMLDefine, options *common.Options) string {
 	code := ""
 	firstField := true
 	for _, field := range define.Fields {
@@ -147,8 +134,8 @@ func (define *XMLDefine) generateDBFieldCode(options *Options) string {
 					log.Printf("!WARNING!: Upgrade require field default values, check definition of '%s::%s'\n", define.Name, field.Name)
 				}
 				code += fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `%s` %s NOT NULL DEFAULT '%s';\n",
-					define.getDBTableName(options),
-					field.getDBColumnName(options),
+					getDBTableName(define, options),
+					field.GetDBColumnName(options),
 					//field.getDBType(options),
 					field.TypeMapping(options.CurrentDoc.DBTypeMappings),
 					defaultValue)
@@ -156,22 +143,22 @@ func (define *XMLDefine) generateDBFieldCode(options *Options) string {
 		} else {
 			if firstField {
 				code += fmt.Sprintf("  `%s` %s NOT NULL %s,\n",
-					field.getDBColumnName(options),
+					field.GetDBColumnName(options),
 					field.TypeMapping(options.CurrentDoc.DBTypeMappings),
-					field.additionalDBCreateStatement(options))
+					field.AdditionalDBCreateStatement(options))
 				firstField = false
 			} else {
 				code += fmt.Sprintf("  `%s` %s NOT NULL %s,\n",
-					field.getDBColumnName(options),
+					field.GetDBColumnName(options),
 					field.TypeMapping(options.CurrentDoc.DBTypeMappings),
-					field.additionalDBCreateStatement(options))
+					field.AdditionalDBCreateStatement(options))
 			}
 		}
 	}
 	return code
 }
 
-func (define *XMLDefine) generateDBCreateCodeForField(options *Options, list []XMLDataTypeField, typeString string, isPrimary bool) string {
+func generateDBCreateCodeForField(define *common.XMLDefine, options *common.Options, list []common.XMLDataTypeField, typeString string, isPrimary bool) string {
 	code := ""
 
 	firstField := isPrimary
@@ -183,24 +170,24 @@ func (define *XMLDefine) generateDBCreateCodeForField(options *Options, list []X
 					log.Fatalf("!Error: Upgrade require field default values!\nCheck definition of '%s::%s`\n", define.Name, field.Name)
 				}
 				code += fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `%s` %s NULL DEFAULT %s;\n",
-					define.getDBTableName(options),
-					field.getDBColumnName(options),
+					getDBTableName(define, options),
+					field.GetDBColumnName(options),
 					typeString,
 					defaultValue)
 			}
 		} else {
 			if firstField {
-				code += fmt.Sprintf("  `%s` %s NOT NULL,\n", field.getDBColumnName(options), typeString)
+				code += fmt.Sprintf("  `%s` %s NOT NULL,\n", field.GetDBColumnName(options), typeString)
 				firstField = false
 			} else {
-				code += fmt.Sprintf("  `%s` %s DEFAULT NULL,\n", field.getDBColumnName(options), typeString)
+				code += fmt.Sprintf("  `%s` %s DEFAULT NULL,\n", field.GetDBColumnName(options), typeString)
 			}
 		}
 	}
 	return code
 }
 
-func (define *XMLDefine) generateDBCreateCodeForStrings(options *Options, list []XMLDataTypeField) string {
+func generateDBCreateCodeForStrings(define *common.XMLDefine, options *common.Options, list []common.XMLDataTypeField) string {
 	code := ""
 
 	for _, field := range list {
@@ -217,15 +204,15 @@ func (define *XMLDefine) generateDBCreateCodeForStrings(options *Options, list [
 				}
 
 				code += fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `%s` varchar(%d) NULL DEFAULT `%s`",
-					define.getDBTableName(options),
-					field.getDBColumnName(options),
+					getDBTableName(define, options),
+					field.GetDBColumnName(options),
 					fieldSize,
 					defaultValue)
 			}
 
 		} else {
 			code += fmt.Sprintf("  `%s` varchar(%d) DEFAULT NULL,\n",
-				field.getDBColumnName(options),
+				field.GetDBColumnName(options),
 				fieldSize)
 		}
 
@@ -234,7 +221,7 @@ func (define *XMLDefine) generateDBCreateCodeForStrings(options *Options, list [
 	return code
 }
 
-func (define *XMLDefine) generateDBCreateCodeForFieldWithoutNULL(list []XMLDataTypeField, typeString string) string {
+func generateDBCreateCodeForFieldWithoutNULL(define *common.XMLDefine, list []common.XMLDataTypeField, typeString string) string {
 	code := ""
 	for _, field := range list {
 		name := strings.ToLower(field.Name)

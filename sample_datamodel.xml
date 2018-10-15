@@ -2,21 +2,49 @@
 <doc namespace="resource">
 
     <imports>
+        <package>time</package>        
         <package no_persistence="true">uuid github.com/satori/go.uuid</package>
-        <package>time</package>
     </imports>
 
+ 
+    <dbtypemappings>
+        <map from="guid" to="varchar(36)" />
+        <map from="string" to="varchar(%d)" fieldsize="128"/>
+        <map from="time" to="datetime" />
+        <map from="mediumblob" to="mediumblob" />
+        <map from="SensorState" to="int(11)" />
+        <map from="ActionType" to="int(11)" />
+        <map from="ActionStatus" to="int(11)" />
+        <map from="UserRole" to="int(11)" />
+    </dbtypemappings>
+
+    <gotypemappings>
+        <map from="guid" to="uuid.UUID" />
+        <map from="time" to="time.Time" />
+        <map from="mediumblob" to="[]byte"/>
+        <map from="float" to="float32" />
+    </gotypemappings>
+
+
+    <dbcontrol>
+        <host>localhost</host>
+        <dbname>sensors</dbname>
+        <user>sensors</user>
+        <password>sensors</password>
+    </dbcontrol>
+
+    <define type="enum" name="UserRole">
+        <int name="UserRoleAdmin" value="1"/>
+        <int name="UserRoleUser" value="100"/>
+    </define>
+
     <define type="class" name="Resource">
-        <guid name="ResourceID" />
-        <guid name="UserID" />
-        <guid name="EntityID" />        
-        <string name="Filename" />
-        <string name="Path" />
-        <string name="MimeType" />
-        <bool name="IsEntityResource" />
-        <bool name="External" />
-        <time name="CreateDate" />
-        <time name="LastUpdateDate" />
-        <list type="byte" name="Data" />
+        <field type="guid" name="UserID" />
+        <field type="string" name="Name" />
+        <field type="string" name="PasswordHash" />
+        <field type="bool" name="Verified" />
+        <field type="time" name="RegistrationDate" />
+        <field type="time" name="LastAuthDate" />
+        <field type="UserRole" name="Role"/>        
     </define>
 </doc>
