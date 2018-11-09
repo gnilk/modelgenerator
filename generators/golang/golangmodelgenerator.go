@@ -28,6 +28,7 @@ func (generator *CodeGenerator) GenerateCode(doc common.XMLDoc, options *common.
 		// generate code for all defines
 		for _, define := range doc.Defines {
 			//log.Printf("Generate for define: %s\n", define.Name)
+			generator.Methods = nil
 			code += generator.generateCode(options, &define)
 			// if string(outputDir[len(outputDir)-1:]) != "/" {
 			// 	outputDir += "/"
@@ -189,6 +190,7 @@ func (generator *CodeGenerator) generateClassCode(options *common.Options, defin
 	code += fmt.Sprintf("\n")
 
 	if options.GettersAndSetters {
+		//		log.Printf("Generate Getters and Setter for: %s\n", define.Name)
 		code += generator.generateGettersAndSettersForDefine(options, define)
 	}
 
@@ -201,6 +203,11 @@ func (generator *CodeGenerator) generateGettersAndSettersForDefine(options *comm
 		if method.IsPointer != true {
 			ptrAttrib = ""
 		}
+		if method.Define.Name != define.Name {
+			continue
+		}
+
+		//		log.Printf("Generating getter/setter for: %s::%s (%s)\n", method.Define.Name, method.Name, define.Name)
 
 		if method.Getter == true {
 			if method.IsList != true {
@@ -244,8 +251,9 @@ func (generator *CodeGenerator) generateGettersAndSettersForDefine(options *comm
 func (generator *CodeGenerator) generateFields(options *common.Options, define *common.XMLDefine) string {
 	code := ""
 
+	//	log.Printf("Generate fields for: %s\n", define.Name)
 	for _, field := range define.Fields {
-		log.Printf("  Field: %s\n", field.Name)
+		//		log.Printf("  Field: %s\n", field.Name)
 		code += generator.goFieldCode(options, &field)
 		generator.methodFromField(define, field, field.TypeMapping(options.CurrentDoc.GOTypeMappings), field.IsList)
 	}
@@ -271,6 +279,7 @@ func (generator *CodeGenerator) goFieldCode(options *common.Options, field *comm
 func (generator *CodeGenerator) methodFromField(define *common.XMLDefine, field common.XMLDataTypeField, typeString string, isList bool) {
 
 	method := common.AccessMethod{
+		Define:    define,
 		Getter:    true,
 		Setter:    true,
 		IsList:    isList,
@@ -280,7 +289,7 @@ func (generator *CodeGenerator) methodFromField(define *common.XMLDefine, field 
 		NoPersist: field.SkipPersistance,
 		AutoID:    field.DBAutoID,
 	}
-
+	//	log.Printf("  methodFromField: %s, %s, %s\n", define.Name, typeString, field.Name)
 	generator.Methods = append(generator.Methods, method)
 }
 
