@@ -48,6 +48,9 @@
         <int name="UserRoleAdmin" value="1"/>
         <int name="UserRoleUser" value="100"/>
     </define>
+    <define type="class" prefix="m_" name="Subobject">
+        <field type="string" name="NameOfObject" />>
+    </define>
 
     <define type="class" prefix="m_" name="Resource">
         <field type="string" name="StringValue" />
@@ -55,7 +58,10 @@
         <field type="float" name="FloatValue" />
         <field type="bool" name="Verified" />
         <field type="UserRole" name="EnumValue"/>
-        <field type="int" islist="true" name="IntList" />>
+        <field type="int" islist="true" name="IntList" />
+        <field type="Subobject" name="Subba" />>
+        <field type="Subobject" name="SubList" islist="true" ispointer="true" />>
+        <field type="Subobject" name="PtrSubba" ispointer="true" />>
     </define>
 
 </doc>
