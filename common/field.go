@@ -49,6 +49,18 @@ func (field *XMLDataTypeField) TypeMappingLang(typeMappings []XMLTypeMapping, la
 	return field.Type
 }
 
+func (field *XMLDataTypeField) GetTypeMappingLang(typeMappings []XMLTypeMapping, lang string) *XMLTypeMapping {
+	for _, mapping := range typeMappings {
+		if strings.Compare(mapping.Lang, lang) == 0 {
+			if mapping.FromType == field.Type {
+				// If this is not specified, assume the type mapping does not require it
+				return &mapping
+			}
+		}
+	}
+	return nil
+}
+
 //
 // TODO: These should be moved out of here
 //

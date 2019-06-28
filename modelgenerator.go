@@ -146,6 +146,7 @@ func printHelp() {
 	fmt.Println("  -p : Generate persistence (use optional 'class' to specifiy which class for persistence, or '-' for all - default)")
 	fmt.Println("  -s : split each type in separate file")
 	fmt.Println("  -l : specify output language (go/cpp/ts)")
+	fmt.Println("  -m : override model member prefix (use '!' to drop it)")
 	fmt.Println("Domain Model Options")
 	fmt.Println("  -c : generate convertes (to/from XML/JSON)")
 	fmt.Println("  -g : disable getters/setters")
@@ -199,6 +200,8 @@ func main() {
 		IsUpgrade:             false,
 		FromVersion:           0, // Always assume from version 0
 		GenerateDropStatement: false,
+		MemberPrefix:          "",
+		CPPJson:               true,
 	}
 
 	if len(os.Args) > 1 {
@@ -220,6 +223,10 @@ func main() {
 				case 'l':
 					i++
 					options.UseLanguage = os.Args[i]
+					break
+				case 'm':
+					i++
+					options.MemberPrefix = os.Args[i]
 					break
 				case 'f':
 					i++

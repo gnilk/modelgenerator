@@ -26,11 +26,14 @@
     </gotypemappings>
 
     <anytypemappings>
-        <map lang="cpp" from="string" to="std::string" />
+        <map lang="cpp" from="string" to="std::string"/>
         <map lang="cpp" from="guid" to="uuid_t" />
         <map lang="cpp" from="time" to="std::tm" />
         <map lang="cpp" from="mediumblob" to="uint8_t *"/>
-        <map lang="cpp" from="float" to="float" />
+        <map lang="cpp" from="float" to="float" decode="atof(%s.c_str())"/>
+        <map lang="cpp" from="int" to="int32_t" encode="(int)%s" decode="atoi(%s.c_str())" />
+        <map lang="cpp" from="bool" to="bool" decode="(%s == &quot;true&quot;)" />
+        <map lang="cpp" from="UserRole" to="UserRole" encode="(int)%s" decode="(UserRole)atoi(%s.c_str())" />
     </anytypemappings>
 
 
@@ -47,12 +50,12 @@
     </define>
 
     <define type="class" prefix="m_" name="Resource">
-        <field type="guid" name="UserID" />
-        <field type="string" name="Name" />
-        <field type="string" name="PasswordHash" />
+        <field type="string" name="StringValue" />
+        <field type="int" name="IntValue" />
+        <field type="float" name="FloatValue" />
         <field type="bool" name="Verified" />
-        <field type="time" name="RegistrationDate" />
-        <field type="time" name="LastAuthDate" />
-        <field type="UserRole" name="Role"/>        
+        <field type="UserRole" name="EnumValue"/>
+        <field type="int" islist="true" name="IntList" />>
     </define>
+
 </doc>

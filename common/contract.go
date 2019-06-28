@@ -17,10 +17,12 @@ type Options struct {
 	IsUpgrade             bool
 	GenerateDropStatement bool
 	GettersAndSetters     bool
+	CPPJson               bool
 	FromVersion           int    // Always assume from version 0
 	DocumentRootDirectory string // This is set by code to the root directory of the first document, relative for all includes
 	UseLanguage           string
 	Language              Language
+	MemberPrefix          string
 	CurrentDoc            *XMLDoc
 }
 

@@ -58,6 +58,8 @@ type XMLTypeMapping struct {
 	Lang      string `xml:"lang,attr"`
 	FromType  string `xml:"from,attr"`
 	ToType    string `xml:"to,attr"`
+	Encode    string `xml:"encode,attr"`
+	Decode    string `xml:"decode,attr"`
 	FieldSize int    `xml:"fieldsize,attr"`
 }
 
