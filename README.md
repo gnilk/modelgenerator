@@ -32,20 +32,23 @@ You can specify additional imports in the 'imports' section. These will be place
 An XML document can hold many classes - each document will generate on GO file (there is an experimental option to split per class but - but I never use it).
 
 Use the tool like:
-ModelGenerator 2.1 - XML Data Model to Language structure converter
+ModelGenerator 2.2 - XML Data Model to Language structure converter
 Usage: modelgenerator [-sv] [-p <class>] [-f <num>] [-o <file/dir>] <inputfile>
 General Options
   -f : From Version, generates any class/field matching >= specified version (0 means as virgin)
   -p : Generate persistence (use optional 'class' to specifiy which class for persistence, or '-' for all - default)
   -s : split each type in separate file
+  -l : specify output language (go/cpp/ts)
+  -m : override model member prefix (use '!' to drop it)
 Domain Model Options
   -c : generate convertes (to/from XML/JSON)
   -g : disable getters/setters
   -o : specify output model file or '-' for stdout (default) 
+  -M : generate marshalling code (defaults: CPP: off, GO: on, Typescript: on)
 DB Layer Options
   -P : Table name prefix (default is 'nagini_se_')
   -d : Generate drop statements before create (default = false)
-  -O : specify output database go file or dir (if split in multiplefiles is true), default is 'db.go'
+  -O : specify output database go file or dir (if split in multiple files is true), default is 'db.go'
   -v : increase verbose output (default 0 - none)
   -h : this page
 inputfile : XML Data Model definition file
@@ -85,7 +88,9 @@ Following ROOT tags are supported:
 * imports - GO language imports
 * define - definintion of a data type (enum or class)
 
-
+## Note to C++
+The current CPP marshalling code depends on a unreleased marshalling library. Therefore the marshalling code generator is switched off at the moment. You can switch generation of this code with '-M' if you want. I will try to release the marshalling
+code once it's in a stable state.
 
 
 
