@@ -22,7 +22,7 @@ import (
 )
 
 const Name = "ModelGenerator"
-const Version = "2.1"
+const Version = "2.2"
 
 //
 // Load's an XML document an preprocess (load and merge any include directive)
@@ -151,10 +151,11 @@ func printHelp() {
 	fmt.Println("  -c : generate convertes (to/from XML/JSON)")
 	fmt.Println("  -g : disable getters/setters")
 	fmt.Println("  -o : specify output model file or '-' for stdout (default) ")
+	fmt.Println("  -M : generate marshalling code (defaults: CPP: off, GO: on, Typescript: on)")
 	fmt.Println("DB Layer Options")
 	fmt.Println("  -P : Table name prefix (default is 'nagini_se_')")
 	fmt.Println("  -d : Generate drop statements before create (default = false)")
-	fmt.Println("  -O : specify output database go file or dir (if split in multiplefiles is true), default is 'db.go'")
+	fmt.Println("  -O : specify output database go file or dir (if split in multiple files is true), default is 'db.go'")
 	fmt.Println("  -v : increase verbose output (default 0 - none)")
 	fmt.Println("  -h : this page")
 	fmt.Println("inputfile : XML Data Model definition file")
@@ -201,7 +202,7 @@ func main() {
 		FromVersion:           0, // Always assume from version 0
 		GenerateDropStatement: false,
 		MemberPrefix:          "",
-		CPPJson:               true,
+		CPPJson:               false,
 	}
 
 	if len(os.Args) > 1 {
@@ -237,6 +238,9 @@ func main() {
 					break
 				case 'g':
 					options.GettersAndSetters = false
+					break
+				case 'M':
+					options.CPPJson = true
 					break
 				case 'p':
 					options.DoPersistence = true

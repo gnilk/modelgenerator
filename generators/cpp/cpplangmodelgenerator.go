@@ -42,10 +42,12 @@ func (generator *CodeGenerator) GenerateCode(doc common.XMLDoc, options *common.
 	return code
 }
 
+// returns the domain JSON base class
 func domainJSONBaseName(doc *common.XMLDoc) string {
 	return (string(unicode.ToUpper(rune(doc.Namespace[0]))) + doc.Namespace[1:] + "JSONBase")
 }
 
+// generates JSON Base Class with "Empty" marshalling interface
 func (generator *CodeGenerator) generateJSONBaseClass(doc *common.XMLDoc, options *common.Options) string {
 	code := ""
 	code += fmt.Sprintf("class %s : public IMarshal, public IUnmarshal {\n", domainJSONBaseName(doc))
@@ -141,6 +143,7 @@ func generateModelGenJSONSupport(define *common.XMLDefine, doc *common.XMLDoc, o
 	code += fmt.Sprintf("    virtual void Marshal(IEncoder &encoder, std::string name = \"\", bool hasNext = false) const {\n")
 	code += fmt.Sprintf("        encoder.Begin(name);\n")
 
+	// Marshalling code
 	for _, field := range define.Fields {
 		fmt.Printf("%+v\n", field)
 		if field.IsList {
@@ -174,60 +177,86 @@ func generateModelGenJSONSupport(define *common.XMLDefine, doc *common.XMLDoc, o
 	code += fmt.Sprintf("        return false;\n")
 	code += fmt.Sprintf("    }\n")
 
+	//
 	// If we have a list we need to decide who handles sub-unmarshalling of list items
+	//
 	if bNeedUnmarshalField {
-		code += fmt.Sprintf("    virtual IUnmarshal *GetUnmarshalForField(std::string &name) {\n")
-		for _, field := range define.Fields {
-			if isFieldUserDefined(&field, doc) {
-				define := getFieldUserDefine(&field, doc)
-				if define == nil {
-					fmt.Printf("[ERR] Unable to find definition for variable '%s' of type '%s'\n", field.Name, field.Type)
-					// Hmm, no need to progress further
-					os.Exit(1)
-				}
-				code += fmt.Sprintf("        if (name == \"%s\") {\n", field.Name)
-				if field.IsPointer {
-					if field.IsList {
-						code += fmt.Sprintf("            return new %s();\n", field.Type)
-					} else {
-						code += fmt.Sprintf("            %s = new %s();\n", field.Name, field.Type)
-						code += fmt.Sprintf("            return (IUnmarshal *)%s;\n", field.Name)
-
-					}
-				} else {
-					code += fmt.Sprintf("            return &%s;\n", field.Name)
-				}
-				code += fmt.Sprintf("        }\n")
-			} else if field.IsList == true {
-				code += fmt.Sprintf("        if (name == \"%s\") {\n", field.Name)
-				code += fmt.Sprintf("            return this;\n")
-				code += fmt.Sprintf("        }\n")
-			}
-
-		}
-		code += fmt.Sprintf("        return NULL;\n")
-		code += fmt.Sprintf("    }\n")
+		code += generateUnmarshalForField(define, doc, options)
 	}
 	// This is used for objects and lists which are pointers
 	if bNeedPushToArray {
-		code += fmt.Sprintf("    virtual bool PushToArray(std::string &name, IUnmarshal *ptrData) {\n")
-		for _, field := range define.Fields {
-			if isFieldUserDefined(&field, doc) {
-				if field.IsPointer && field.IsList {
-					code += fmt.Sprintf("        if (name == \"%s\") {\n", field.Name)
-					code += fmt.Sprintf("            this->%s.push_back((%s *)ptrData);\n", field.Name, field.Type)
-					code += fmt.Sprintf("            return true;\n")
-					code += fmt.Sprintf("        }\n")
-				}
-			}
-		}
-		code += fmt.Sprintf("        return false;\n")
-		code += fmt.Sprintf("    }\n")
+		code += generatePushToArray(define, doc, options)
 	}
 
 	return code
 }
 
+//
+// Generates code for 'GetUnmarshalForField' which handles marshalling of non-native types
+//
+func generateUnmarshalForField(define *common.XMLDefine, doc *common.XMLDoc, options *common.Options) string {
+	code := ""
+	code += fmt.Sprintf("    virtual IUnmarshal *GetUnmarshalForField(std::string &name) {\n")
+	for _, field := range define.Fields {
+		if isFieldUserDefined(&field, doc) {
+			define := getFieldUserDefine(&field, doc)
+			if define == nil {
+				fmt.Printf("[ERR] Unable to find definition for variable '%s' of type '%s'\n", field.Name, field.Type)
+				// Hmm, no need to progress further
+				os.Exit(1)
+			}
+			code += fmt.Sprintf("        if (name == \"%s\") {\n", field.Name)
+			if field.IsPointer {
+				if field.IsList {
+					code += fmt.Sprintf("            return new %s();\n", field.Type)
+				} else {
+					code += fmt.Sprintf("            %s = new %s();\n", field.Name, field.Type)
+					code += fmt.Sprintf("            return (IUnmarshal *)%s;\n", field.Name)
+
+				}
+			} else {
+				code += fmt.Sprintf("            return &%s;\n", field.Name)
+			}
+			code += fmt.Sprintf("        }\n")
+		} else if field.IsList == true {
+			code += fmt.Sprintf("        if (name == \"%s\") {\n", field.Name)
+			code += fmt.Sprintf("            return this;\n")
+			code += fmt.Sprintf("        }\n")
+		}
+
+	}
+	code += fmt.Sprintf("        return NULL;\n")
+	code += fmt.Sprintf("    }\n")
+
+	return code
+}
+
+//
+// generate code for 'PushToArray'
+//
+func generatePushToArray(define *common.XMLDefine, doc *common.XMLDoc, options *common.Options) string {
+	code := ""
+
+	code += fmt.Sprintf("    virtual bool PushToArray(std::string &name, IUnmarshal *ptrData) {\n")
+	for _, field := range define.Fields {
+		if isFieldUserDefined(&field, doc) {
+			if field.IsPointer && field.IsList {
+				code += fmt.Sprintf("        if (name == \"%s\") {\n", field.Name)
+				code += fmt.Sprintf("            this->%s.push_back((%s *)ptrData);\n", field.Name, field.Type)
+				code += fmt.Sprintf("            return true;\n")
+				code += fmt.Sprintf("        }\n")
+			}
+		}
+	}
+	code += fmt.Sprintf("        return false;\n")
+	code += fmt.Sprintf("    }\n")
+
+	return code
+}
+
+//
+// list unmarshalling
+//
 func writeListUnmarshal(field *common.XMLDataTypeField, options *common.Options) string {
 	code := ""
 	code += fmt.Sprintf("        if (name == \"%s\") {\n", field.Name)
@@ -243,6 +272,9 @@ func writeListUnmarshal(field *common.XMLDataTypeField, options *common.Options)
 	return code
 }
 
+//
+// Write field unmarshalling for native types
+//
 func writeFieldUnmarshal(field *common.XMLDataTypeField, options *common.Options) string {
 	code := ""
 	if field.IsPointer || isFieldUserDefined(field, options.CurrentDoc) {
@@ -262,6 +294,9 @@ func writeFieldUnmarshal(field *common.XMLDataTypeField, options *common.Options
 	return code
 }
 
+//
+// Write marshalling code for array's of native types
+//
 func writeListMarshalling(field *common.XMLDataTypeField, options *common.Options) string {
 	code := ""
 	code += fmt.Sprintf("        encoder.BeginArray(\"%s\");\n", field.Name)
@@ -272,10 +307,21 @@ func writeListMarshalling(field *common.XMLDataTypeField, options *common.Option
 	return code
 }
 
+//
+// Write marshalling code for user defined types (mostly object)
+//
 func writeFieldForUserDefine(field *common.XMLDataTypeField, options *common.Options) string {
 	define := getFieldUserDefine(field, options.CurrentDoc)
 	if define != nil {
-		code := fmt.Sprintf("        %s.Marshal(encoder, %s);\n", field.Name, field.Name)
+		code := ""
+		if field.IsPointer {
+			// Guard for CPP pointers
+			code += fmt.Sprintf("        if (%s != NULL) {\n", field.Name)
+			code += fmt.Sprintf("            %s->Marshal(encoder, \"%s\");\n", field.Name, field.Name)
+			code += fmt.Sprintf("        }\n")
+		} else {
+			code += fmt.Sprintf("        %s.Marshal(encoder, \"%s\");\n", field.Name, field.Name)
+		}
 		return code
 	}
 	fmt.Printf("ERR: can't find user definition for: %s\n", field.Name)
