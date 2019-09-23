@@ -189,6 +189,8 @@ func (generator *CodeGenerator) generateClassCode(options *common.Options, defin
 	code += fmt.Sprintf("}\n")
 	code += fmt.Sprintf("\n")
 
+	code += generator.generateConstructor(options, define)
+
 	if options.GettersAndSetters {
 		//		log.Printf("Generate Getters and Setter for: %s\n", define.Name)
 		code += generator.generateGettersAndSettersForDefine(options, define)
@@ -196,6 +198,24 @@ func (generator *CodeGenerator) generateClassCode(options *common.Options, defin
 
 	return code
 }
+
+func (generator *CodeGenerator) generateConstructor(options *common.Options, define *common.XMLDefine) string {
+	code := ""
+
+	code += fmt.Sprintf("func New%s() %s {\n", define.Name, define.Name)
+	code += fmt.Sprintf("  inst := %s{}\n", define.Name)
+	for _, f := range define.Fields {
+		if len(f.Default) > 0 {
+			code += fmt.Sprintf("  inst.%s = %s\n", f.Name, f.Default)
+		}
+	}
+	code += fmt.Sprintf("  return inst\n")
+	code += fmt.Sprintf("}\n")
+	code += fmt.Sprintf("\n")
+
+	return code
+}
+
 func (generator *CodeGenerator) generateGettersAndSettersForDefine(options *common.Options, define *common.XMLDefine) string {
 	code := ""
 	for _, method := range generator.Methods {
@@ -271,7 +291,12 @@ func (generator *CodeGenerator) goFieldCode(options *common.Options, field *comm
 	if field.IsPointer {
 		typePrefix = typePrefix + "*"
 	}
-	code += fmt.Sprintf("  %s %s%s\n", field.Name, typePrefix, field.TypeMapping(options.CurrentDoc.GOTypeMappings))
+	code += fmt.Sprintf("  %s %s%s", field.Name, typePrefix, field.TypeMapping(options.CurrentDoc.GOTypeMappings))
+
+	if field.XMLAttrib != "" {
+		code += fmt.Sprintf("`xml:\"%s\"`", field.XMLAttrib)
+	}
+	code += fmt.Sprintf("\n")
 
 	return code
 }

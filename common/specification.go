@@ -23,6 +23,7 @@ type XMLDataTypeField struct {
 	FromVersion     int    `xml:"fromversion,attr"`
 	SkipPersistance bool   `xml:"nopersist,attr"`
 	DBAutoID        bool   `xml:"dbautoid,attr"`
+	XMLAttrib       string `xml:"xmlattrib,attr"`
 }
 
 // XMLDefine declares an object (type/struct)

@@ -338,7 +338,7 @@ func generatePersistenceCreateCode(define *common.XMLDefine) string {
 
 	// TODO: Check if we should support this... not quite sure..
 	if !haveAtleastOneField {
-		log.Fatalf("Class: '%s' has only one field or no field!! - this won't work, set attribute 'nonpersist=\"true\"' on class to generate lagnuage definition but no persistence code.", define.Name)
+		log.Printf("Class: '%s' has only one field or no field!! - this won't work, set attribute 'nonpersist=\"true\"' on class to generate lagnuage definition but no persistence code.", define.Name)
 	}
 
 	code = code[:len(code)-1]
