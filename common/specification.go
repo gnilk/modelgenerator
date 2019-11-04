@@ -6,6 +6,7 @@ package common
 type XMLDBControl struct {
 	Host     string `xml:"host"`
 	DBName   string `xml:"dbname"`
+	Schema   string `xml:"schema"`
 	User     string `xml:"user"`
 	Password string `xml:"password"`
 }
