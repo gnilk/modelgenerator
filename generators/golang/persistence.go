@@ -126,7 +126,7 @@ func (generator *CrudGenerator) generatePersistenceHeader(doc common.XMLDoc, opt
 	//	code += fmt.Sprintf("   DB_NAME        = \"gnilk\"\n")
 	code += fmt.Sprintf("   DB_USER        = \"%s\"\n", doc.DBControl.User)
 	code += fmt.Sprintf("   DB_PASSWORD    = \"%s\"\n", doc.DBControl.Password)
-	if (doc.DBControl.Schema != "") {
+	if (len(doc.DBControl.Schema) < 1) {
 		code += fmt.Sprintf("   DB_SCHEMA      = \"%s%s\"\n", options.DBTablePrefix, schemaName)
 	} else {
 		code += fmt.Sprintf("   DB_SCHEMA      = \"%s\"\n", doc.DBControl.Schema);
