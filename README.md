@@ -32,6 +32,7 @@ You can specify additional imports in the 'imports' section. These will be place
 An XML document can hold many classes - each document will generate on GO file (there is an experimental option to split per class but - but I never use it).
 
 Use the tool like:
+```
 ModelGenerator 2.2 - XML Data Model to Language structure converter
 Usage: modelgenerator [-sv] [-p <class>] [-f <num>] [-o <file/dir>] <inputfile>
 General Options
@@ -52,6 +53,7 @@ DB Layer Options
   -v : increase verbose output (default 0 - none)
   -h : this page
 inputfile : XML Data Model definition file
+```
 
 ## Examples:
 ### Generate only language domain model without getters/setters (-g)**
