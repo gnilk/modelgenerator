@@ -1,5 +1,5 @@
 BIN = $(GOPATH)/bin
-MODELGEN = $(BIN)/modelgenerator
+MODELGEN = modelgenerator
 GOIMPORTS = $(BIN)/goimports
 
 
@@ -14,7 +14,7 @@ all:	generator
 
 
 generator: 	$(GENERATOR_FILES)
-	go build -o $(MODELGEN) -i $(GENERATOR_FILES)
+	go build -o $(MODELGEN) $(GENERATOR_FILES)
 
 
 test:	generator $(MODEL_SRC)
